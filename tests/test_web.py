@@ -290,3 +290,11 @@ def test_recharge_card_endpoint(home):
         r = client.get("/api/electricity/recharge").json()
         assert r["remainingKwh"] == 28.9 and r["dailyKwh"] == 6.4 and r["daysLeft"] == 4.5
         assert "weixiao.qq.com" in r["payUrl"] and "openid" not in r["payUrl"] and "卡包" in r["paySteps"]
+
+
+def test_demo_meta_links_to_real_service(home, monkeypatch):
+    """演示站要告诉访客真实服务在哪（曾有人把演示站当真实服务、输入了真实密码）。真实服务不带这个字段。"""
+    monkeypatch.setenv("SZU_AGENT_REAL_URL", "https://example.test")
+    with TestClient(create_app(mock=True, llm=ScriptedChatModel(script=[]), profile=ProfileStore(home / "p.json"))) as client:
+        assert client.get("/api/meta").json()["realUrl"] == "https://example.test"
+        assert 'id="demoBanner"' in client.get("/").text

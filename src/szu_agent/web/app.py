@@ -425,7 +425,10 @@ def create_app(*, mock: bool | None = None, llm: BaseChatModel | None = None, pr
     async def meta():
         from ..agent.threads import retention_days
 
-        return {"mock": mock, "historyDays": retention_days(), "multiuser": multi}
+        out = {"mock": mock, "historyDays": retention_days(), "multiuser": multi}
+        if mock and (real := os.environ.get("SZU_AGENT_REAL_URL")):
+            out["realUrl"] = real  # 演示站上给出真实服务的地址（部署脚本写入）
+        return out
 
     def _stream(thread_id: str, inputs: Any, user_id: str) -> StreamingResponse:
         config = _config(thread_id, user_id)

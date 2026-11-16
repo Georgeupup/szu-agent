@@ -3,12 +3,13 @@
 #
 #   本机：tar 打包项目（排除 .venv/.venv-win/.env/resource/缓存）→ scp 到服务器 /tmp/szu-agent-upload.tgz
 #         .env 单独 scp 到 /tmp/szu-agent.env（只有第一次需要）
-#   服务器：bash /home/szu/szu-agent/deploy/setup-server.sh <服务器公网IP>   （第一次在解压目录里运行）
+#   服务器：bash setup-server.sh <服务器公网IP> [真实服务网址，默认 https://<IP>]
 #
 # 做的事：建 szu 账号 → 装 nginx、uv → 解压代码 → uv sync → systemd 两个服务（真实服务多人模式、演示站）
 #        → 服务器密钥（已有就不动！换了所有人的 user_id 都会变）→ 自签名证书（已有就不动）→ nginx → 启动并自检
 set -euo pipefail
-IP="${1:?用法：bash setup-server.sh <服务器公网IP>}"
+IP="${1:?用法：bash setup-server.sh <服务器公网IP> [真实服务网址]}"
+REAL_URL="${2:-https://$IP}"
 APP=/home/szu/szu-agent
 UV=/home/szu/.local/bin/uv
 
@@ -46,6 +47,9 @@ if [ ! -f "$D/multiuser.conf" ]; then
   umask 022
 fi
 chmod 600 "$D/multiuser.conf"
+# 演示站上显示“去真实服务”的链接
+mkdir -p /etc/systemd/system/szu-agent-demo.service.d
+printf '[Service]\nEnvironment=SZU_AGENT_REAL_URL=%s\n' "$REAL_URL" > /etc/systemd/system/szu-agent-demo.service.d/real-url.conf
 
 # 自签名证书（有域名后用 certbot 换掉）
 mkdir -p /etc/nginx/ssl && chmod 700 /etc/nginx/ssl

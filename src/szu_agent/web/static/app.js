@@ -775,6 +775,7 @@ async function openThread(id) {
 // 密码只通过 /api/auth/password 发给本机后端，再由后端发给深大统一认证；不会进入对话，也不会发给 AI 模型。
 let auth = { loggedIn: false };
 let quota = null;     // 每日额度（多人模式默认每人每天 ¥0.5）；没开就是 null
+let demoMode = false, realUrl = "";  // 演示站：数据是假的、不连接学校，登录卡片不出现账号密码输入框
 let multiuser = false; // 部署到服务器给多人用：先用学校统一认证登录爱小荔，每个人的记忆和历史分开
 let activeLogin = null; // 同一时间只保留一张可用的登录卡片
 
@@ -817,6 +818,7 @@ function addLoginCard({ resume, realm = "main" }) {
   scrollDown(true);
   const state = { card, resume, realm, timer: null, loginId: null, done: false };
   activeLogin = state;
+  if (demoMode) { renderDemoLogin(state); return; }
 
   const tabs = card.querySelectorAll(".login-tabs button");
   tabs.forEach((t) => t.addEventListener("click", () => {
@@ -826,6 +828,23 @@ function addLoginCard({ resume, realm = "main" }) {
   }));
   card.querySelector("form").addEventListener("submit", (e) => { e.preventDefault(); passwordLogin(state, e.target); });
   startQr(state);
+}
+
+// 演示站的登录：不收任何账号密码（演示站走 http、也不连学校，真实密码绝不能输在这里），一键用演示账号登录
+function renderDemoLogin(state) {
+  state.card.querySelector(".login-tabs").remove();
+  state.card.querySelectorAll(".login-body").forEach((p) => p.remove());
+  state.card.querySelector(".note").outerHTML = `
+    <div class="login-body">
+      <p class="qr-tip">这是<strong>演示站</strong>：数据都是假的，不连接学校。<strong>不要在这里输入真实的账号密码</strong>。</p>
+      <button class="btn primary" type="button">一键体验登录</button>
+    </div>
+    <p class="note">${realUrl ? `要用真实账号，请去 <a href="${esc(realUrl)}">${esc(realUrl.replace(/^https?:\/\//, ""))}</a>` : "演示账号，随时可以退出"}</p>`;
+  state.card.querySelector(".login-body button").onclick = async () => {
+    const r = await fetch("/api/auth/password", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: "demo", password: "demo", remember: true, realm: state.realm || "main" }) }).then((x) => x.json()).catch(() => null);
+    if (r?.ok) loginDone(state);
+  };
 }
 
 async function startQr(state) {
@@ -877,9 +896,9 @@ function loginNeedsMfa(state, mfa) {
 async function loginDone(state) {
   state.done = true; clearTimeout(state.timer); activeLogin = null;
   const firstLogin = multiuser && !auth.appSession; // 多人模式第一次登录：身份变了，重新加载这个人的历史和记忆
-  state.card.querySelector(".login-tabs").remove();
+  state.card.querySelector(".login-tabs")?.remove();
   state.card.querySelectorAll(".login-body").forEach((p) => p.remove());
-  state.card.querySelector(".note").outerHTML = `<div class="result ok">✓ 已登录${multiuser ? "" : "，凭证保存在本机"}，之后的任务会自动使用</div>`;
+  state.card.querySelector(".note").outerHTML = `<div class="result ok">✓ 已登录${multiuser || demoMode ? "" : "，凭证保存在本机"}，之后的任务会自动使用</div>`;
   await refreshAuth();
   if (firstLogin) { location.reload(); return; }
   loadToday();
@@ -1059,7 +1078,13 @@ $("#accountBtn").addEventListener("click", async () => {
 tick(); setInterval(tick, 10_000);
 Promise.all([refreshAuth(), fetch("/api/meta").then((r) => r.json()).catch(() => ({}))]).then(([, m]) => {
   multiuser = !!m.multiuser;
+  demoMode = !!m.mock; realUrl = m.realUrl || "";
   $("#modeChip").hidden = !m.mock;
+  if (demoMode) {
+    const b = $("#demoBanner");
+    b.innerHTML = `这是<strong>演示站</strong>：数据都是假的，不连接学校，不要输入真实账号密码。${realUrl ? ` <a href="${esc(realUrl)}">去真实服务 →</a>` : ""}`;
+    b.hidden = false;
+  }
   const where = multiuser ? "保存在服务器上，只有你自己能看到" : "保存在你自己的电脑上";
   $("#historyNote").textContent = `${where}，${m.historyDays > 0 ? `超过 ${m.historyDays} 天自动删除` : "不会自动删除"}。登录密码和验证码从不进入对话，所以也不会出现在这里。`;
   if (multiuser && !auth.appSession) addLoginCard({ resume: false });
