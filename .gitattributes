@@ -1,0 +1,2 @@
+# 统一用 LF：项目在 Windows 上编辑、在 Linux 服务器上运行，避免换行符来回变化
+* text=auto eol=lf

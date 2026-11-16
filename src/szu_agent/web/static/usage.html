@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>模型用量 · 荔园助手</title>
+<style>
+  :root {
+    --bg: #F6F5F9; --card: #FFFFFF; --ink: #1E1828; --muted: #6B6380; --line: #E7E3EF;
+    --hit: #B9A6DA; --miss: #3A1E5C; --out: #E04A5F; --good: #3F7F45; --warn: #B8324A;
+    --font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #15121C; --card: #1F1A29; --ink: #ECE8F4; --muted: #A39BB5; --line: #2F2840;
+            --hit: #6E5A93; --miss: #C9B8EA; --out: #F07A8A; --good: #7CC383; --warn: #F07A8A; color-scheme: dark; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.55 var(--font); }
+  main { max-width: 980px; margin: 0 auto; padding: 28px 16px 48px; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+  h1 { font-size: 20px; margin: 0; font-weight: 650; }
+  h2 { font-size: 15px; margin: 0 0 10px; font-weight: 600; }
+  .seg { display: inline-flex; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 3px; }
+  .seg button { border: 0; background: none; color: var(--muted); font: inherit; padding: 5px 12px; border-radius: 7px; cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: var(--miss); color: var(--card); }
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; }
+  .tile .k { color: var(--muted); font-size: 12.5px; }
+  .tile .v { font-size: 24px; font-weight: 650; margin: 2px 0; font-variant-numeric: tabular-nums; }
+  .tile .s { color: var(--muted); font-size: 12px; }
+  .good { color: var(--good); } .warn { color: var(--warn); }
+  section { margin-bottom: 16px; }
+  .bars { display: flex; flex-direction: column; gap: 6px; }
+  .bar-row { display: grid; grid-template-columns: 86px 1fr 132px; gap: 10px; align-items: center; font-size: 12.5px; }
+  .bar { display: flex; height: 14px; border-radius: 4px; overflow: hidden; background: var(--line); }
+  .bar i { display: block; height: 100%; }
+  .legend { display: flex; gap: 14px; color: var(--muted); font-size: 12px; margin-top: 8px; }
+  .legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; background: var(--c); }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { color: var(--muted); font-weight: 500; }
+  td.t { white-space: normal; max-width: 320px; }
+  .num { text-align: right; }
+  .scroll { overflow-x: auto; }
+  .note { color: var(--muted); font-size: 12px; }
+  .note a { color: inherit; }
+  .empty { color: var(--muted); padding: 18px 0; text-align: center; }
+  @media (max-width: 720px) { .tiles { grid-template-columns: repeat(2, 1fr); } .bar-row { grid-template-columns: 70px 1fr 96px; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>模型用量</h1>
+    <div class="seg" role="group" aria-label="时间范围">
+      <button data-days="1">近 24 小时</button><button data-days="7" aria-pressed="true">近 7 天</button><button data-days="30">近 30 天</button>
+    </div>
+  </header>
+
+  <div class="tiles">
+    <div class="card tile"><div class="k">花费（估算）</div><div class="v" id="cost">—</div><div class="s" id="cost-s"></div></div>
+    <div class="card tile"><div class="k">缓存命中率</div><div class="v" id="hit">—</div><div class="s">命中的输入 ÷ 全部输入</div></div>
+    <div class="card tile"><div class="k">输入 tokens</div><div class="v" id="input">—</div><div class="s" id="input-s"></div></div>
+    <div class="card tile"><div class="k">输出 tokens</div><div class="v" id="output">—</div><div class="s" id="output-s"></div></div>
+  </div>
+
+  <section class="card">
+    <h2>每天</h2>
+    <div class="bars" id="daily"></div>
+    <div class="legend"><span style="--c: var(--hit)">输入·缓存命中</span><span style="--c: var(--miss)">输入·未命中</span><span style="--c: var(--out)">输出</span></div>
+  </section>
+
+  <section class="card">
+    <h2>花费最多的对话</h2>
+    <div class="scroll"><table id="threads"></table></div>
+  </section>
+
+  <section class="card">
+    <h2>最近 20 次调用</h2>
+    <div class="scroll"><table id="recent"></table></div>
+  </section>
+
+  <p class="note" id="note"></p>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const fmt = (n) => n == null ? "—" : n >= 1e6 ? (n / 1e6).toFixed(2) + "M" : n >= 1e4 ? (n / 1e3).toFixed(1) + "K" : String(n);
+const yuan = (c) => c == null ? "—" : c < 0.01 ? "¥" + c.toFixed(4) : "¥" + c.toFixed(2);
+const pct = (r) => r == null ? "—" : (r * 100).toFixed(1) + "%";
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const when = (iso) => new Date(iso).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+const PURPOSE = { chat: "回答", summary: "压缩历史" };
+
+async function load(days) {
+  document.querySelectorAll(".seg button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.days === String(days))));
+  const r = await (await fetch(`/api/usage?days=${days}`)).json();
+  const t = r.total;
+  $("cost").textContent = r.pricing.priced ? yuan(t.cost) : "未配置价格";
+  $("cost-s").textContent = `${t.calls} 次调用 · 平均 ${t.avg_latency_ms == null ? "—" : (t.avg_latency_ms / 1000).toFixed(1) + " 秒"}`;
+  const hit = $("hit");
+  hit.textContent = pct(t.hitRate);
+  hit.className = "v " + (t.hitRate == null ? "" : t.hitRate >= 0.8 ? "good" : t.hitRate < 0.5 ? "warn" : "");
+  $("input").textContent = fmt(t.input);
+  $("input-s").textContent = `命中 ${fmt(t.hit)} · 未命中 ${fmt(t.miss)}`;
+  $("output").textContent = fmt(t.output);
+  const parts = [];
+  if (t.reasoning) parts.push(`其中思考 ${fmt(t.reasoning)}`);
+  const sum = r.byPurpose.summary;
+  if (sum) parts.push(`压缩历史 ${sum.calls} 次`);
+  $("output-s").textContent = parts.join(" · ");
+
+  const max = Math.max(1, ...r.daily.map((d) => d.input + d.output));
+  $("daily").innerHTML = r.daily.length ? r.daily.map((d) => `
+    <div class="bar-row"><span>${d.day.slice(5)}</span>
+      <div class="bar" title="命中 ${d.hit} / 未命中 ${d.miss} / 输出 ${d.output}">
+        <i style="width:${d.hit / max * 100}%;background:var(--hit)"></i><i style="width:${d.miss / max * 100}%;background:var(--miss)"></i><i style="width:${d.output / max * 100}%;background:var(--out)"></i>
+      </div>
+      <span class="num">${yuan(d.cost)} · 命中 ${pct(d.hitRate)}</span></div>`).join("")
+    : `<div class="empty">这段时间还没有模型调用</div>`;
+
+  $("threads").innerHTML = r.threads.length ? `<tr><th>对话</th><th class="num">调用</th><th class="num">输入</th><th class="num">命中率</th><th class="num">输出</th><th class="num">花费</th></tr>` +
+    r.threads.map((x) => `<tr><td class="t">${esc(x.title)}</td><td class="num">${x.calls}</td><td class="num">${fmt(x.input)}</td>
+      <td class="num">${pct(x.hitRate)}</td><td class="num">${fmt(x.output)}</td><td class="num">${yuan(x.cost)}</td></tr>`).join("")
+    : `<tr><td class="empty">暂无</td></tr>`;
+
+  $("recent").innerHTML = r.recent.length ? `<tr><th>时间</th><th>用途</th><th class="num">输入</th><th class="num">命中</th><th class="num">输出</th><th class="num">耗时</th><th class="num">花费</th></tr>` +
+    r.recent.map((x) => `<tr><td>${when(x.ts)}${x.peak ? " · 高峰" : ""}</td><td>${PURPOSE[x.purpose] || esc(x.purpose)}</td>
+      <td class="num">${fmt(x.input)}</td><td class="num">${pct(x.hitRate)}</td><td class="num">${fmt(x.output)}</td>
+      <td class="num">${x.latency_ms == null ? "—" : (x.latency_ms / 1000).toFixed(1) + "s"}</td><td class="num">${yuan(x.cost)}</td></tr>`).join("")
+    : `<tr><td class="empty">暂无</td></tr>`;
+
+  const p = r.pricing;
+  $("note").innerHTML = `模型 ${esc(p.model)}。${esc(p.note)} 价格来源：<a href="${esc(p.source)}" target="_blank" rel="noopener">DeepSeek 官方价格页</a>（${esc(p.verifiedAt)} 核对）。`
+    + (t.no_usage ? ` 有 ${t.no_usage} 次调用接口没返回用量，未计入。` : "");
+}
+
+document.querySelectorAll(".seg button").forEach((b) => b.addEventListener("click", () => load(b.dataset.days)));
+load(7);
+</script>
+</body>
+</html>

@@ -1,0 +1,403 @@
+﻿﻿<!DOCTYPE html><html class="root-main">
+<!-- 移动端 --><!-- PC端 --><!--校外用户登录--><!-- 二维码扫码登录 --><!-- 兼容性登录 --><!--校外用户登录--><!-- 帐号登录或动态码登录 --><head>
+    <meta charset="utf-8"/><meta http-equiv="Content-Type" content="text/html; charset=utf-8"/><meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"/><title>统一身份认证平台</title>
+    <script>
+      var inputUserNameTip = "\u8BF7\u8F93\u5165\u7528\u6237\u540D";
+      var inputPasswordTip = "\u8BF7\u8F93\u5165\u5BC6\u7801";
+      var inputCodeTip = "\u8BF7\u8F93\u5165\u9A8C\u8BC1\u7801";
+      var qrLoginTip = "\u4F01\u4E1A\u5FAE\u4FE1\u626B\u7801";
+      var qrInvalidTip = "\u4E8C\u7EF4\u7801\u5DF2\u5931\u6548\uFF0C\u70B9\u51FB\u5237\u65B0";
+
+      var inputMobileTip = "\u8BF7\u8F93\u5165\u624B\u673A\u53F7\u6216\u5B66\u53F7";
+      var inputDynamicTip = "\u8BF7\u8F93\u5165\u9A8C\u8BC1\u7801";
+      var getDynamicCodeTip = "\u83B7\u53D6\u9A8C\u8BC1\u7801";
+      var inputDynamicGetCode = "\u83B7\u53D6\u9A8C\u8BC1\u7801";
+      var excludeRegular = "\u7528\u6237\u540D\u5305\u542B\u7279\u6B8A\u5B57\u7B26";
+      //不转码，防止参数丢失
+      var service = ["https:\/\/ehall.szu.edu.cn\/login?service=https:\/\/ehall.szu.edu.cn\/new\/index.html"];
+      var type = null;
+      var jsonObject = {"pcLogoPath":null,"pcThemeColor":null,"officialUrl":null,"defaultWxQrCode":0,"wxQrCode":null,"defaultImage":0,"imageType":1,"shufflingTime":5,"shufflingStyle":2,"imageNames":["default_login.jpg"],"mobileLogoPath":null,"mobileThemeColor":null,"mobileModel":0,"mobileImages":["default_mobile_login.png"],"otherModel":0,"otherImages":["default_auth_serv_bg.png"]};
+      var reg = "[$:{}]";
+      var qrCodeLoginType = "1";
+    </script>
+    <script type="text/javascript">
+      if (service == '' || !service) {
+        service = '';//saml后缀
+      }
+      var isQrLogin = "false";
+      var isQrLoginEnabled = "true"
+      var captchaSwitch = "2";
+      var needCaptcha = "";
+      var _fidoEnabled = "false";
+      var _fidoGuideEnabled = "false" // 3.8.2.SP4 是否开启fido引导
+      var _fidoGuideBindType = "" // 3.8.2.SP4 fido引导绑定方式
+      var is_dynamicLogin = "false";
+      var is_userNameLogin = "true";
+      var contextPath = "/authserver";
+      var cllt = "";
+      var _badCredentialsCount = "3";
+      var rememberMeTip = '开启后7天内无需再次登录，主动退出登录或使用浏览器无痕模式访问后，此功能失效'
+    </script>
+    <style>
+        .change-color{
+            color: #990033 !important;
+        }
+        .change-bg-color{
+            background-color: #990033 !important;
+        }
+        .change-bd-color{
+            border-color: #990033 !important;
+        }
+    </style>
+    <link rel="stylesheet" type="text/css" href="/authserver/cusSzuTheme/static/css/toastr.min.css?v=20260703.154014"><link rel="stylesheet" type="text/css" href="/authserver/cusSzuTheme/static/web/css/login.css?v=20260703.154014"/><link rel="stylesheet" type="text/css" href="/authserver/cusSzuTheme/static/web/iconfont/iconfont.css?v=20260703.154014"/><link rel="stylesheet" type="text/css" href="/authserver/cusSzuTheme/static/web/css/fido.css?v=20260703.154014"/><link rel="stylesheet" type="text/css" href="/authserver/cusSzuTheme/static/common/css/swiper.min.css?v=20260703.154014"/><link rel="stylesheet" type="text/css" href="/authserver/cusSzuTheme/customStatic/web/css/gorgeous.css?v=20260703.154014"/><link rel="stylesheet" type="text/css"
+      href="/authserver/cusSzuTheme/customStatic/web/css/custom.css?v=20260703.154014"/><script type="text/javascript" src="/authserver/cusSzuTheme/static/common/swiper.min.js?v=20260703.154014"></script>
+    <script type="text/javascript" src="/authserver/cusSzuTheme/static/common/jquery-latest.min.js?v=20260703.154014"></script>
+    <script type="text/javascript" src="/authserver/cusSzuTheme/static/js/plugin/toastr.min.js?v=20260703.154014"></script>
+    <script type="text/javascript" src="/authserver/cusSzuTheme/static/common/utils.js?v=20260703.154014"></script>
+    <script type="text/javascript" src="/authserver/cusSzuTheme/static/common/common-header.js?v=20260703.154014"></script>
+    <script type="text/javascript" src="/authserver/cusSzuTheme/static/common/encrypt.js?v=20260703.154014"></script>
+    <script type="text/javascript" src="/authserver/cusSzuTheme/static/web/js/fido.js?v=20260703.154014"></script>
+    <script type="text/javascript" src="/authserver/cusSzuTheme/static/web/js/schoolCombinedLogin.js?v=20260703.154014"></script>
+    <script type="text/javascript" src="/authserver/cusSzuTheme/static/web/js/login.js?v=20260703.154014"></script>
+
+    <style>
+        #rememberMeTipDiv:hover .bubbleTip{
+            display: block;
+        }
+        #myRememberMe{
+            overflow: visible !important;
+        }
+        .bubbleTip{
+            background-color: black;
+            color: white;
+            display: none;
+            padding: 8px 12px 8px 12px;
+            line-height: 18px;
+            text-align: left;
+            position: absolute;
+            top: -10px;
+            left: -5px;
+            font-size: 12px;
+            z-index: 100;
+            width: 300px;
+            white-space: break-spaces;
+            top: 50%;
+            transform: translate(30px, -50%);
+        }
+        .bubbleTip::before{
+            position: absolute;
+            content: '';
+            height: 0;
+            width: 0;
+            border-width: 1em;
+            border-style: solid;
+            border-color: transparent black transparent transparent;
+            left: -1.5em;
+            top: 0px;
+            bottom: 0px;
+            margin: auto;
+        }
+    </style>
+    <script type="text/javascript">
+        $(function(){
+            $("#myRememberMe").attr("title", "")
+        });
+    </script>
+</head>
+<body>
+<div class="container-ge">
+    <div class="auth_page_wrappers">
+        <!-- 轮播图 --><!-- <div class="swiper-container swiper-main">
+            <div class="swiper-wrapper">
+                <div class="swiper-slide" style="opacity: 0.15;" th:each="imageName :${@systemConfigUtils.getBackgroundProperties().imageNames}">
+                    <img th:src="@{${#themes.code('static.path')}+'/common/images/'+${imageName}}" style="width: 100%;height: 100%"/>
+                </div>
+            </div>
+        </div> --><div class="auth_page_body">
+            <div class="auth_page_content">
+                <div class="g-logo-title">
+                    <div class="school-logo">
+                            <img src="/authserver/cusSzuTheme/customStatic/web/images/logo.png" alt="" /><span class="split-lines"></span>
+                        <span class="logo-title lang_text_ellipsis">统一身份认证</span>
+                    </div>
+                    <div class="t-language-switch">
+                        <div class="g-language-switch item">
+                            <button class="g-switch-result" style="height: 32px">
+                                <span id="language_switch_name" class="g-switch-btn lang_text_ellipsis"></span>
+                                <span class="g-switch-arrow"></span>
+                            </button>
+                            <div class="item-show">
+                                <ul id="language_switch" class="g-switch-list"></ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="auth_login_content">
+                    <!-- <div class="left-bg">
+                        <th:block th:each="imageName,imgStatus :${@systemConfigUtils.getBackgroundProperties().imageNames}">
+                            <img th:class="${imgStatus.first} ? 'content-bg active' : 'content-bg'" th:src="@{${#themes.code('static.path')}+'/common/images/'+${imageName}}"/>
+                        </th:block>
+                    </div> --><div class="login-wrap">
+                      <div class="left-wrap">
+                        <!-- 嵌入二维码登录 --><section class="auth-qroce">
+                          <span class="qrcode_title lang_text_ellipsis">企业微信扫码</span>
+                          <div class="qrcode-middle">
+                            <div>
+<script type="text/javascript" src="/authserver/cusSzuTheme/static/custom/js/qrcode.js?v=20260703.154014"></script>
+<div class="qr_scan_box">
+    <form method="post" id="qrLoginForm" action="/authserver/login" role="form">
+        <div id="qr_code">
+             <div class="qr_scan_code"><img id="qr_img" src=""/></div>
+             <span class="title lang_text_ellipsis">手机扫码  安全登录</span>
+        </div>
+
+        <div id="qr_success" style="display: none">
+            <div class="qr_scan_success">
+                <img src="/authserver/cusSzuTheme/static/custom/images/Success.png"/><span class="title title_h1 lang_text_ellipsis">扫描成功</span>
+                <span class="sub_title lang_text_ellipsis">请在手机上「确认登录」</span>
+            </div>
+            <div class="scan_footer lang_text_ellipsis"><a class="scan_a" href="javascript:refresh();">返回二维码</a></div>
+        </div>
+
+        <div id="qr_invalid" style="display: none">
+            <div class="qr_scan_code">
+                <img id="invalid_img" src=""/><div class="qr_scan_Invalid">
+                    <img id="qr_refresh" src="/authserver/cusSzuTheme/static/custom/images/refresh.png" onclick="refresh()"/></div>
+            </div>
+            <span class="title lang_text_ellipsis">手机扫码  安全登录</span>
+        </div>
+
+        <input type="hidden" name="lt" id="lt" value="" /><input type="hidden" name="uuid" id="uuid" value=""/><input type="hidden" name="cllt" value="qrLogin"/><input type="hidden" id="dllt" name="dllt" value="generalLogin"><input type="hidden" name="execution" value="e1s1"/><input type="hidden" name="_eventId" value="submit"/><input type="hidden" name="rmShown" value="1"></form>
+</div>
+</div>
+                          </div>
+                          <div class="qrcode_img_tip">
+                            <p class="qrcode_tip num-text-ellipsis-2">企业微信扫码</p>
+                          </div>
+                        </section>
+                        <a class="use-tip-button" href="https://www1.szu.edu.cn/v.asp?id=191" target="_blank">使用说明</a>
+                      </div>
+                      <div style="position: relative;">
+                        <div class="wrap-ge">
+                          <!-- <a id="qrCodeA" class="qrcodeA" style="display: none;"></a>
+                          <a id="qrCodeB" class="qrcodeB" style="display: none;"></a> --><section class="main">
+                            <div class="tabHead">
+                              <span id="pwdLoginSpan" title="账号登录" style="display: none">
+                                <a id="userNameLogin_a" href="javascript:void(0)" onclick="showTabHeadAndDiv('userNameLogin',1)"
+                                  class="loginFont_a text_ellipsis">账号登录</a>
+                                <div class='tabHead-underline change-bg-color'>&nbsp;</div>
+                              </span>
+                              <span id="phoneLoginSpan" title="验证码登录" style="display: none">
+                                <a id="dynamicLogin_a" href="javascript:void(0)" onclick="showTabHeadAndDiv('dynamicLogin',1)"
+                                  class="loginFont_a text_ellipsis">验证码登录</a>
+                                <div class='tabHead-underline change-bg-color'>&nbsp;</div>
+                              </span>
+                              <span id="fidoLoginSpan" style="max-width: 120px;display: none" title="生物识别">
+                                <a id="fidoLogin_a" href="javascript:void(0)" onclick="showTabHeadAndDiv('fidoLogin',1)"
+                                  class="loginFont_a text_ellipsis">生物识别</a>
+                                <div class='tabHead-underline change-bg-color'>&nbsp;</div>
+                              </span>
+                              <span id="qrLoginSpan" title="企业微信扫码" style="display: none">
+                                <a id="qrLogin_a" href="javascript:void(0)" onclick="showTabHeadAndDiv('qrLogin',1)"
+                                  class="loginFont_a text_ellipsis">企业微信扫码</a>
+                                <div class='tabHead-underline change-bg-color'>&nbsp;</div>
+                              </span>
+                            </div>
+                            <div class="login-main login-slider">
+                              <!--登录FORM--><div id="loginViewDiv"></div>
+                              <div class="help-inline">
+                                <div class="help-inline-tip"></div>
+                              </div>
+                            </div>
+                          </section>
+                      
+                          </div>
+                      </div>
+                    </div>
+                </div>
+                <!-- <div class="bottom-pane">
+                    <div class="item" th:if="${!#strings.isEmpty(@systemConfigUtils.getBackgroundProperties().officialUrl)}">
+                        <a class="item-img" th:href="${@systemConfigUtils.getBackgroundProperties().officialUrl}" target="_blank">
+                            <svg width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M13 23C10.3478 23 7.8043 21.9464 5.92893 20.0711C4.05357 18.1957 3 15.6522 3 13C3 10.3478 4.05357 7.8043 5.92893 5.92893C7.8043 4.05357 10.3478 3 13 3C15.6522 3 18.1957 4.05357 20.0711 5.92893C21.9464 7.8043 23 10.3478 23 13C23 15.6522 21.9464 18.1957 20.0711 20.0711C18.1957 21.9464 15.6522 23 13 23V23ZM10.7093 20.6667C9.7229 18.5741 9.15147 16.3101 9.02667 14H5.06267C5.25731 15.5388 5.89468 16.988 6.89732 18.1715C7.89996 19.355 9.22473 20.2218 10.7107 20.6667H10.7093ZM11.0293 14C11.1813 16.44 11.8773 18.7293 13 20.752C14.1521 18.6765 14.825 16.3694 14.9693 14H11.0293V14ZM20.9373 14H16.9733C16.8481 16.3102 16.2762 18.5742 15.2893 20.6667C16.7753 20.2218 18.1 19.355 19.1027 18.1715C20.1053 16.988 20.7427 15.5388 20.9373 14V14ZM5.06267 12H9.02667C9.152 9.68933 9.724 7.42667 10.7107 5.33333C9.22448 5.77797 7.89943 6.6447 6.89653 7.82819C5.89364 9.01169 5.25608 10.461 5.06133 12H5.06267ZM11.0307 12H14.9693C14.825 9.63057 14.1521 7.32351 13 5.248C11.8475 7.3234 11.1741 9.63047 11.0293 12H11.0307V12ZM15.2893 5.33333C16.2762 7.42585 16.8481 9.68983 16.9733 12H20.9373C20.7427 10.4612 20.1053 9.01197 19.1027 7.82849C18.1 6.64501 16.7753 5.77819 15.2893 5.33333V5.33333Z" fill="currentColor"/>
+                            </svg>
+                        </a>
+                        <span class="item-img-tips lang_text_ellipsis" th:text="#{ids.loginView.company.website}"></span>
+                        <div class="prompt-top item-show">
+                            <span style="width: 100%" class="lang_text_ellipsis" th:text="#{ids.loginView.company.website}"></span>
+                        </div>
+                    </div>
+                    <div class="item" th:if="${!#strings.isEmpty(@systemConfigUtils.getBackgroundProperties().wxQrCode)}">
+                        <div class="item-img">
+                            <svg width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path fill-rule="evenodd" clip-rule="evenodd" d="M9.78484 4.21314C11.3867 3.39198 13.205 3.41615 14.9149 4.00547C16.197 4.44732 17.398 5.20121 18.3655 6.12306C15.8883 5.85814 13.8654 6.0283 12.1138 6.98435C10.2591 7.99662 8.79131 9.84444 7.38424 12.7547C6.61805 10.8736 6.41178 9.25335 6.69842 7.91285C7.02927 6.36564 8.0341 5.1106 9.78484 4.21314ZM20.6047 14.7132C20.0735 12.6595 18.5411 10.891 15.9895 9.00427C16.6586 9.02489 17.4084 9.10771 18.161 9.27305C19.5239 9.57247 20.8284 10.1276 21.6864 11.0046C23.3959 12.7521 23.9289 15.997 22.7937 18.577C22.3617 19.5586 21.5242 20.3878 20.6111 21.0319C20.1935 21.3264 19.7693 21.5758 19.3771 21.778C20.6324 19.0201 21.1387 16.7775 20.6047 14.7132ZM3.82546 19.0092C3.29926 17.497 3.29224 15.5214 3.85396 12.9601C4.98305 15.6324 6.28772 17.4516 8.11207 18.4587V21.1691L11.305 19.3639C13.0109 19.5002 15.0234 19.2432 17.4431 18.6789C15.7656 22.564 11.7719 24.1122 8.00389 22.775C5.7863 21.988 4.43806 20.7695 3.82546 19.0092Z" fill="currentColor" />
+                            </svg>
+                        </div>
+                        <span class="item-img-tips lang_text_ellipsis" th:text="#{ids.loginView.wxgzh}"></span>
+                        <div class="item-show wx_detail">
+                            <img th:src="@{${#themes.code('static.path')}+'/common/images/'+${@systemConfigUtils.getBackgroundProperties().wxQrCode}}">
+                            <p class="scan-gw lang_text_ellipsis" th:text="#{ids.loginView.wisedu.wxgzh}"></p>
+                        </div>
+                    </div>
+                    <div class="copy-bottom" th:utext="#{copyright.description}"></div>
+                </div> --></div>
+        </div>
+    </div>
+</div>
+<!-- 滑块验证码 --><div id="sliderCaptchaDiv"></div>
+<!-- fido登录 --><div id="fidoLoginDiv" style="display: none">
+    <div style="height: 260px;margin-top: 60px">
+		<a href="javascript:void(0);" onclick="startAssertion('#loginFromId');" class="loginFont_a">
+			<div class="fidoLogo">
+				<img class="fidoLogoImage" src="/authserver/cusSzuTheme/static/web/images/fido.jpg" alt=""/><div id="ukey_info" class="text change-color num-text-ellipsis-2" style="width: 100%;">点击开启识别登录</div>
+			</div>
+		</a>
+		<form class="loginFromClass" method="post" id="loginFromId" action="/authserver/login">
+			<div class="lang_text_ellipsis" style="width:100%;color: red;margin-top: 10px;">
+				<span id="showErrorTip"></span>
+			</div>
+			<input type="hidden" id="_eventId" name="_eventId" value="submit" /><input type="hidden" id="username-fido" name="username" value=""><input type="hidden" id="responseJson-fido" name="responseJson" value=""><input type="hidden" id="cllt" name="cllt" value="fidoLogin"><input type="hidden" id="dllt" name="dllt" value="generalLogin"><input type="hidden" name="lt" id="lt" value="" /><input type="hidden" id="execution" name="execution" value="e1s1" /></form>
+		<div class="lang_text_ellipsis" style="width:100%;color: red;display: none;" id="showFidoErrorTip">
+			<span id="showFidoErrorTipSpan" style="font-size: 14px;"></span>
+		</div>
+	</div>
+</div>
+<!-- 手机动态码登录 --><div id="phoneLoginDiv" style="display: none">
+    <div>
+		<form class="loginFromClass" method="post" id="phoneFromId" action="/authserver/login">
+			<div class="form">
+				<!-- 动态码登录 --><div class="m-phone">
+					<div class="username item" style="overflow: visible;">
+						<p class="account-title pc-mobile">
+              <img class="icon-info" src="/authserver/cusSzuTheme/customStatic/web/images/phone.png"/><span class="lang_text_ellipsis">手机号</span>
+							<span class="item" style="position: absolute;">
+								<img class="mobile-tip" src="/authserver/cusSzuTheme/customStatic/web/images/question.png" height="16px"><span class="mobile-tip-prompt mobile-item-show">海外手机请按“国家代码-手机号”的格式输入，如：1-888888</span>
+							</span>
+						</p>
+						<input type="text" id="username" name="username" class="change-input-color"
+							   placeholder="请输入手机号/学号" title="请输入手机号/学号" value=""><div id="nameErrorTip" class="item-error-tip lang_text_ellipsis"></div>
+					</div>
+					<div class="captcha item" id="captchaDiv">
+            <img class="icon-info" src="/authserver/cusSzuTheme/customStatic/web/images/captcha.png" /><p id="captchaTitle" class="account-title pc-captcha lang_text_ellipsis">图形验证码</p>
+						<input type="text" id="captcha" name="captcha" autocomplete="off" class="change-input-color"
+							   placeholder="请输入验证码" title="请输入验证码" maxlength="10"><span class="captcha-img">
+							<img id="captchaImg" alt="验证码错误" height="30px"><a class="mask-inner captcha-refresh" onclick="reloadCaptcha(true)" href="javascript:void(0);">刷新</a>
+						</span>
+						<div id="captchaErrorTip" class="item-error-tip lang_text_ellipsis"></div>
+					</div>
+					<div class="code item">
+            <img class="icon-info" src="/authserver/cusSzuTheme/customStatic/web/images/code.png"/><p class="account-title pc-code lang_text_ellipsis">短信验证码</p>
+						<i class="auth_icon auth_icon_bar"></i>
+						<input type="text" id="dynamicCode" name="dynamicCode" autocomplete="off" class="change-input-color"
+							   placeholder="请输入短信验证码" title="请输入短信验证码" maxlength="10"><a class="get-code text_ellipsis" href="javascript:void(0)" onclick="startDynamicCode()" title="获取验证码">
+							<span class="change-color">获取验证码</span>
+						</a>
+						<a class="get-code-tip get-code text_ellipsis" style="display: none;" href="javascript:void(0)" title="后重发">
+							<span class="getCodeText change-color">120</span>
+							<span style="color: #86909C;">后重发</span>
+						</a>
+						<div id="dynamicErrorTip" class="item-error-tip lang_text_ellipsis"></div>
+					</div>
+				</div>
+			</div>
+			<div class="ge-btn">
+				<div id="formErrorTip" class="form-errorTip lang_text_ellipsis">
+					<span id="showErrorTip" class="form-error"></span>
+					<span id="showWarnTip" class="form-warn"></span>&nbsp;
+				</div>
+				<div class="btn">
+					<a id="login_submit" href="javascript:void(0);" class="login-btn change-bg-color" onclick="startLogin(this)">登录</a>
+				</div>
+			</div>
+			<input type="hidden" id="_eventId" name="_eventId" value="submit" /><input type="hidden" id="cllt" name="cllt" value="dynamicLogin"><input type="hidden" id="dllt" name="dllt" value="generalLogin"><input type="hidden" id="lt" name="lt" value="" /><input type="hidden" id="pwdEncryptSalt" value="udphO2EBdBGIcwHE" /><input type="hidden" id="execution" name="execution" value="e1s1" /></form>
+	</div>
+</div>
+<!-- 用户名密码登录 --><div id="pwdLoginDiv" style="display: none">
+    <div>
+		<form class="loginFromClass" method="post" id="pwdFromId" action="/authserver/login">
+			<div class="form">
+				<!-- 用户名密码登录 --><div class="m-account">
+					<div class="username item">
+            <img class="icon-info" src="/authserver/cusSzuTheme/customStatic/web/images/user.png" /><p class="account-title pc-name lang_text_ellipsis">用户名</p>
+						<input id="username" name="username" type="text" autofucus class="change-input-color" onfocusout="checkUserCaptcha()" placeholder="请输入学号/工号" title="请输入学号/工号" value=""><div id="nameErrorTip" class="item-error-tip lang_text_ellipsis"></div>
+					</div>
+					<div class="password item">
+            <img class="icon-info" src="/authserver/cusSzuTheme/customStatic/web/images/pwd.png" /><p class="account-title pc-pass lang_text_ellipsis">密码</p>
+						<input id="password" name="passwordText" type="password" class="change-input-color no-auto-input" readonly
+							   placeholder="请输入密码" title="请输入密码" maxlength="32"><input id="saltPassword" name="password" type="hidden"><a class="ge-input-eye eye-hide"></a>
+						<div id="pwdErrorTip" class="item-error-tip lang_text_ellipsis"></div>
+					</div>
+					<div class="captcha item hide" id="captchaDiv">
+            <img class="icon-info" src="/authserver/cusSzuTheme/customStatic/web/images/captcha.png"/><p id="captchaTitle" class="account-title pc-captcha lang_text_ellipsis hide">验证码</p>
+						<input type="text" id="captcha" name="captcha" autocomplete="off" class="change-input-color"
+							   placeholder="请输入验证码" title="请输入验证码" maxlength="10"><span class="captcha-img">
+							<img id="captchaImg" alt="验证码错误" height="30px"><a class="mask-inner captcha-refresh" onclick="reloadCaptcha(true)" href="javascript:void(0);">刷新</a>
+						</span>
+						<div id="captchaErrorTip" class="item-error-tip lang_text_ellipsis"></div>
+					</div>
+					<div class="cus_help">
+            <div id="myRememberMe" class="m-rememberMe">
+              <input type="checkbox" name="rememberMe" id="rememberMe" value="true"
+                style="width:15px;margin-right:5px;" /><span style="font-size: 13px">7天免登录</span>
+              <div id="rememberMeTipDiv"
+                style="margin-left:6px;position: relative;z-index:100;display: inline-block;min-width: 30px;min-height: 10px;vertical-align: middle;">
+                <img id="rememberMeTip" style="width: 16px;height: 16px;"
+                  src="/authserver/cusSzuTheme/static/web/images/question.svg" /><div class="bubbleTip" id="bubbleTipContainer" style="position: absolute;">开启后7天内无需再次登录，主动退出登录或使用浏览器无痕模式访问后，此功能失效</div>
+              </div>
+            </div>
+            <div class="help">
+              <!-- 帐号激活 --><a id="activationAccountId" href="../retrieve-password/accountActivation/index.html"
+                  class="activation-account lang_text_ellipsis">账号激活</a>
+                <span class="split-lines"></span>
+              <!-- 在线帮助文档  --><!-- 忘记密码 --><a id="retrievePassId" href="../retrieve-password/retrievePassword/index.html"
+                class="fo-password lang_text_ellipsis">忘记密码</a>
+            </div>
+          </div>
+					<div style="clear: both"></div>
+				</div>
+				<div class="ge-btn">
+					<div id="formErrorTip" class="form-errorTip lang_text_ellipsis">
+						<span id="showErrorTip" class="form-error"></span>
+						<span id="showWarnTip" class="form-warn"></span>
+					</div>
+					<div class="btn">
+						<a id="login_submit" href="javascript:void(0);" class="login-btn change-bg-color" onclick="startLogin(this)">登录</a>
+					</div>
+				</div>
+			</div>
+			<input type="hidden" id="_eventId" name="_eventId" value="submit" /><input type="hidden" id="cllt" name="cllt" value="userNameLogin"><input type="hidden" id="dllt" name="dllt" value="generalLogin"><input type="hidden" id="lt" name="lt" value="" /><input type="hidden" id="pwdEncryptSalt" value="udphO2EBdBGIcwHE" /><input type="hidden" id="execution" name="execution" value="e1s1" /></form>
+	</div>
+</div>
+<!-- 嵌入二维码登录 --><div id="qrLoginDiv" style="display: none">
+    <div>
+<script type="text/javascript" src="/authserver/cusSzuTheme/static/custom/js/qrcode.js?v=20260703.154014"></script>
+<div class="qr_scan_box">
+    <form method="post" id="qrLoginForm" action="/authserver/login" role="form">
+        <div id="qr_code">
+             <div class="qr_scan_code"><img id="qr_img" src=""/></div>
+             <span class="title lang_text_ellipsis">手机扫码  安全登录</span>
+        </div>
+
+        <div id="qr_success" style="display: none">
+            <div class="qr_scan_success">
+                <img src="/authserver/cusSzuTheme/static/custom/images/Success.png"/><span class="title title_h1 lang_text_ellipsis">扫描成功</span>
+                <span class="sub_title lang_text_ellipsis">请在手机上「确认登录」</span>
+            </div>
+            <div class="scan_footer lang_text_ellipsis"><a class="scan_a" href="javascript:refresh();">返回二维码</a></div>
+        </div>
+
+        <div id="qr_invalid" style="display: none">
+            <div class="qr_scan_code">
+                <img id="invalid_img" src=""/><div class="qr_scan_Invalid">
+                    <img id="qr_refresh" src="/authserver/cusSzuTheme/static/custom/images/refresh.png" onclick="refresh()"/></div>
+            </div>
+            <span class="title lang_text_ellipsis">手机扫码  安全登录</span>
+        </div>
+
+        <input type="hidden" name="lt" id="lt" value="" /><input type="hidden" name="uuid" id="uuid" value=""/><input type="hidden" name="cllt" value="qrLogin"/><input type="hidden" id="dllt" name="dllt" value="generalLogin"><input type="hidden" name="execution" value="e1s1"/><input type="hidden" name="_eventId" value="submit"/><input type="hidden" name="rmShown" value="1"></form>
+</div>
+</div>
+</div>
+</body>
+<script src="/authserver/cusSzuTheme/static/custom/js/login-language.js?v=20260703.154014" type="text/javascript"></script>
+</html>

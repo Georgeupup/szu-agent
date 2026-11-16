@@ -1,0 +1,19 @@
+# 荔园助手真实服务（多人模式由 drop-in 打开：/etc/systemd/system/szu-agent.service.d/multiuser.conf，setup-server.sh 生成）
+[Unit]
+Description=szu-agent web
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=szu
+WorkingDirectory=/home/szu/szu-agent
+Environment=SZU_AGENT_HOST=127.0.0.1
+Environment=SZU_AGENT_PORT=8000
+ExecStart=/home/szu/.local/bin/uv run --no-sync szu-agent-web
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

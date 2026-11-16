@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "szu-campus": {
+      "command": "uv",
+      "args": ["--directory", "/absolute/path/to/szu-agent", "run", "szu-mcp"],
+      "env": { "SZU_AGENT_MOCK": "0" }
+    }
+  }
+}

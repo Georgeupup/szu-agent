@@ -1,0 +1,5 @@
+- `notice-*.html`、`electricity-usage.html`：来自 [szu-cli](https://github.com/AwesomeHou/szu-cli) 的测试样例（MIT），用于验证移植后的 Python 解析器与原实现结果一致。
+- `cas-login.html`：深大统一身份认证登录页（公开页面，未登录状态下抓取，不含任何个人信息）。
+- `notice-view-legacy.html`：公文通详情页的真实线上布局（2026-11 抓取），登录用户的姓名学号已替换为假数据“张三2020123456”。
+- `my-booking.json`：体育预约“我的预约”接口的真实返回结构（2026-11 抓包，节选 4 条），学号已替换为假数据。
+- `wttr.json`：wttr.in 对深大粤海校区坐标的真实返回（2026-11，公开天气数据）。

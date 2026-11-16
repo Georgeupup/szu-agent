@@ -1,0 +1,11 @@
+{
+  "campuses": [
+    {"name": "深大新斋区", "client": "192.168.84.87", "buildings": [{"name": "红豆斋", "id": "18120"}, {"name": "风槐斋", "id": "18121"}]},
+    {"name": "深大南区", "client": "192.168.84.88", "buildings": [{"name": "海桐斋", "id": "18210"}]}
+  ],
+  "query": {"records": [
+    {"index": 1, "room": "838", "remainingKwh": 41.7, "totalUsedKwh": 21880.2, "totalPurchasedKwh": 21921.9, "recordedAt": "2026-11-10 23:59:00"},
+    {"index": 2, "room": "838", "remainingKwh": 35.2, "totalUsedKwh": 21886.7, "totalPurchasedKwh": 21921.9, "recordedAt": "2026-11-11 23:59:00"},
+    {"index": 3, "room": "838", "remainingKwh": 28.9, "totalUsedKwh": 21893.0, "totalPurchasedKwh": 21921.9, "recordedAt": "2026-11-12 23:59:00"}
+  ]}
+}

@@ -1,0 +1,47 @@
+<!-- 来源：真实页面 https://www.lib.szu.edu.cn/opac/user/myfb.aspx（2026-11-14 用户保存）。
+     只保留分页和预借列表；页头的“欢迎您 + 姓名”、脚本、样式已删除。
+     取消链接 deletefb(fid, status)：页面 JS 只允许 status==0 时取消，deletefbAjax.aspx 返回 1=操作成功、0=操作失败。 -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><title>我的预借图书</title></head><body>
+<div class="pd">第<span class="rf"><span id="cpRight_Pagination2_dplbl2">1</span></span>/<span id="cpRight_Pagination2_gplbl2">1</span>页&nbsp;
+                上一页&nbsp;
+                    下一页
+                &nbsp;转到第<select name="ctl00$cpRight$Pagination2$gotoddl2" id="cpRight_Pagination2_gotoddl2" onchange="gotopage(this[this.selectedIndex].value)">
+	<option selected="selected" value="1">1</option>
+</select>页</div>
+<table cellpadding="4" width="98%" border="1" class="tb">
+<thead class="tbhead">
+<tr><td>序号</td><td>题名</td><td>卷期</td><td>预借取书地点</td><td>提交时间</td><td>状态</td><td></td></tr>
+</thead>
+<tbody>
+<tr>
+<td>
+                                    1
+                                </td>
+<td><span class="title"><a href="https://www.lib.szu.edu.cn/opac/bookinfo.aspx?ctrlno=1901562" target="_blank">
+                                        三体
+                                    </a></span></td>
+<td></td>
+<td>
+                                    粤海校区南区致理楼C栋1层信息中心服务大厅取书柜
+                                </td>
+<td>
+                                    2026-11-14
+                                </td>
+<td>
+                                    未处理
+                                </td>
+<td><a href="javascript:deletefb(175017,0)">[取消]</a></td>
+</tr>
+<tr>
+<td>2</td>
+<td><span class="title"><a href="https://www.lib.szu.edu.cn/opac/bookinfo.aspx?ctrlno=3351727" target="_blank">
+                                        想念地坛
+                                    </a></span></td>
+<td></td>
+<td>粤海校区南区致理楼C栋1层信息中心服务大厅取书柜</td>
+<td>2026-11-14</td>
+<td>读者取消</td>
+<td></td>
+</tr>
+</tbody></table>
+</body></html>

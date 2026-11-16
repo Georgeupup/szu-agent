@@ -1,0 +1,43 @@
+# 资料库检索评测集：模型会传给 campus_guide 的查询 → 应该出现在前 5 条里的条目（任一命中即算对）。
+# expect 为空 = 资料库里没有，应该返回空（让模型如实说“不知道”，而不是拿不相关的条目硬答）。
+# 新增数据或改检索算法后跑 `uv run pytest tests/test_knowledge.py -s` 看命中率。
+- {query: 绿幕, expect: [yh-ziwei-105]}
+- {query: 拍摄 摄影, expect: [yh-ziwei-105]}
+- {query: 编程, expect: [yh-ziwei-104]}
+- {query: 沙盘, expect: [yh-ziwei-101-102]}
+- {query: 党建活动, campus: 丽湖, expect: [lh-qinggangli-301]}
+- {query: 党建, campus: 粤海, expect: [yh-ziwei-106]}
+- {query: 舞蹈排练, expect: [yh-chundi-dance]}
+- {query: 瑜伽, expect: [yh-chundi-dance]}
+- {query: 电影放映, expect: [yh-youlin-theater]}
+- {query: 报告厅 讲座, campus: 丽湖, expect: [lh-huyanglin-214]}
+- {query: 会议室, campus: 丽湖, min_capacity: 30, expect: [lh-shanzhashu-209, lh-qinggangli-301, lh-huyanglin-214]}
+- {query: 会议, campus: 粤海, min_capacity: 20, expect: [yh-fenghuai-101, yh-youlin-3f-meeting]}
+- {query: 研讨室, campus: 丽湖, expect: [lh-qinggangli-302, lh-qinggangli-303, lh-qinggangli-304, lh-qinggangli-305]}
+- {query: 自习, campus: 粤海, expect: [yh-fenghuai-101]}
+- {query: 自习 沙龙, campus: 丽湖, expect: [lh-shanzhashu-201, lh-shanzhashu-202, lh-shanzhashu-207]}
+- {query: 书吧, expect: [yh-youlin-3f-meeting, yh-youlin-2f-room-1, yh-youlin-theater]}
+- {query: 沧海书吧, expect: [yh-youlin-3f-meeting, yh-youlin-2f-room-1, yh-youlin-theater]}
+- {query: 派发传单, campus: 丽湖, expect: [lh-qiming-1f, lh-canteen-doors, lh-zhichang-2f, lh-zhengyi-square]}
+- {query: 摆摊 设点, campus: 粤海, expect: [yh-kaifeng-front, yh-nanqu-canteen-front, yh-tingshan-front]}
+- {query: 晚会 扩音, campus: 粤海, expect: [yh-youth-square, yh-swzx-square]}
+- {query: 石头坞广场, expect: [yh-youth-square]}
+- {query: 风槐斋, expect: [yh-fenghuai-101]}
+- {query: 山楂树 204, expect: [lh-shanzhashu-204]}
+- {query: 静音舱, expect: [swzx-booth]}
+- {query: 静音仓, expect: [swzx-booth]}
+- {query: 网络面试间, expect: [swzx-booth]}
+- {query: 面试, expect: [swzx-booth]}
+- {query: 心灵小屋, expect: [swzx-xinling]}
+- {query: 老师联系方式, expect: [swzx-teacher-contact]}
+- {query: 校园地图, expect: [swzx-campus-map]}
+- {query: 趣味运动会, expect: [lh-zhichang-2f]}
+# 用户原话式的查询（模型没改写时），关键词检索的弱项，用来观察
+- {query: 开会的地方, campus: 丽湖, expect: [lh-shanzhashu-209, lh-qinggangli-301, lh-shanzhashu-204]}
+- {query: 安静学习的房间, expect: [yh-fenghuai-101, lh-shanzhashu-201, yh-ziwei-109]}
+# 资料库里没有
+- {query: 练琴房, expect: [swzx-piano]}
+- {query: 钢琴, expect: [swzx-piano]}
+- {query: 共享会议室, expect: [swzx-meeting-room]}
+- {query: 健身房, expect: []}
+- {query: 游泳馆开放时间, expect: []}

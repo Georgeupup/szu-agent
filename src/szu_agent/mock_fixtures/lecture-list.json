@@ -1,0 +1,4 @@
+{"code": 0, "count": 2, "data": [
+  {"id": "lec-1121", "name": "从 RAG 到 Agent：大模型应用开发实战", "lectureType": "线下", "teacherName": "张老师", "deptName": "计算机与软件学院", "nameOfSponsor": "研究生院", "status": "正在报名中", "startRegistration": "2026-11-12 08:00:00", "deadlineRegistration": "2026-11-18 18:00:00", "lectureStartTime": "2026-11-20 14:30:00", "lectureEndTime": "2026-11-20 16:30:00", "introduceOfLecture": "介绍检索增强生成、工具调用与多智能体协作的工程化落地。"},
+  {"id": "lec-1102", "name": "城市更新与公共空间设计", "lectureType": "线下", "teacherName": "李老师", "deptName": "建筑与城市规划学院", "nameOfSponsor": "建筑与城市规划学院", "status": "报名已结束", "startRegistration": "2026-11-01 08:00:00", "deadlineRegistration": "2026-11-05 18:00:00", "lectureStartTime": "2026-11-08 14:30:00", "lectureEndTime": "2026-11-08 16:30:00"}
+]}

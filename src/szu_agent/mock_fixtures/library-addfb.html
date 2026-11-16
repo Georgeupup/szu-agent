@@ -1,0 +1,31 @@
+<!-- 来源：真实页面 https://www.lib.szu.edu.cn/opac/admin_findbook/addfb.aspx?ctrlno=3351727（2026-11-14 用户保存）。
+     已脱敏：__VIEWSTATE/__EVENTVALIDATION 换成占位值（ViewState 只是 base64，可能含个人信息），
+     预填的邮箱换成示例地址，收件人姓名清空；脚本、样式已删除。表单字段名、取书地点选项与原页面一致。 -->
+<html><head id="Head1"><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><title>增加预借请求</title></head><body>
+<form method="post" action="./addfb.aspx?ctrlno=3351727&amp;rd=0.37653500604045587" id="form1" onsubmit="javascript:return checkall1();">
+<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="VIEWSTATE-PLACEHOLDER" />
+<input type="hidden" name="__VIEWSTATEGENERATOR" id="__VIEWSTATEGENERATOR" value="1A1D0F83" />
+<input type="hidden" name="__EVENTVALIDATION" id="__EVENTVALIDATION" value="EVENTVALIDATION-PLACEHOLDER" />
+<input type="hidden" name="isxili" id="isxili" value="0" />
+<div>预借说明：预借未借出在书库的书。收到【预借图书到书通知】后，请您请务必在3天内到取书地点取书，否则视为违约。违约三次将被取消预借资格30天。</div>
+<span id="lblbookinfo">想念地坛／史铁生著. 天地出版社，2022</span>
+<div id="fbdiv" style="">
+<select name="ddlvolume" id="ddlvolume" class="form-control"><option value=""></option></select>
+<select name="ddlfl" id="ddlfl" class="form-control" onchange="javascript:changefl();">
+	<option selected="selected" value="-1">----   请选择   ----</option>
+	<option value="4">丽湖校区启明楼（中央图书馆） A2服务台</option>
+	<option value="6">粤海校区南区致理楼C栋1层信息中心服务大厅取书柜</option>
+	<option value="3">粤海校区汇典楼（北馆）二楼借还书台</option>
+</select>
+<input name="txtemail" type="text" value="student@mails.szu.edu.cn" id="txtemail" class="form-control" />
+<input name="txtphone" type="text" id="txtphone" class="form-control" style="width:100%;" />
+<div id="addressdiv" style="display: none;">
+<input name="kdaddress" type="text" id="kdaddress" />
+<input name="kdphone" type="text" id="kdphone" />
+<input name="kdname" type="text" value="" id="kdname" />
+</div>
+<input type="submit" name="Button1" value="提交" id="Button1" class="btn btn-primary" />
+<input type="button" value="取消" onclick="javascript:canclefbRequest();" />
+</div>
+<div id="ebookdiv" style="display:none;"><input type="button" value="继续提交" onclick="javascript:jxtj()" /></div>
+</form></body></html>

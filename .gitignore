@@ -1,0 +1,15 @@
+.venv/
+.venv-win/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+env
+resource/kb-raw/
+# 宣传视频和配乐是渲染产物，体积大，不进仓库（源文件 promo.html / frames.js / render.js / synth_bgm.py 在）
+resource/promo/*.mp4
+resource/promo/*.mp3
+# 本地工具配置
+.claude/
+*.sqlite
+*.sqlite-*

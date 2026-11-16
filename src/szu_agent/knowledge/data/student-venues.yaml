@@ -1,0 +1,277 @@
+# 学生活动场地（室外露天 + 室内活动室）
+# 来源：公众号文章“一、使用学生活动场地”一节的表格截图，2026-11-14 由用户提供，手工转录。
+# 维护：开放时间、规则每学期可能变，改了内容就同时更新 verified_at。
+# capacity：表里写明的人数上限 / 座位数（如“30 人以内会议”“共 9 个座位”“会议椅 16 张”），没写明就不填，不要估算。
+source:
+  id: student-venues
+  title: 学生活动场地使用说明（公众号文章）
+  url: https://mp.weixin.qq.com/s/qG6upiFc6p_4JJwwVAuREg
+verified_at: 2026-11-14
+
+defaults:
+  category: 学生活动场地
+  booking:
+    how: 事务中心「学生活动场地申请」（深大内部网 → 事务中心 → 场地申请）
+    url: http://swzx.szu.edu.cn/mini/#/pages/venue/szu-venue-list
+    url_offcampus: https://swzx.webvpn.szu.edu.cn/mini/#/pages/venue/szu-venue-list
+
+entries:
+  # ---------------- 粤海 · 室外 ----------------
+  - id: yh-kaifeng-front
+    name: 凯风餐厅前空地
+    campus: 粤海
+    kind: 室外
+    hours: "8:00-19:00"
+    rules: 可用于派发传单、设点咨询、宣传等，同一时段仅支持 1 个组织开展活动。
+  - id: yh-nanqu-canteen-front
+    name: 南区食堂前空地
+    campus: 粤海
+    kind: 室外
+    hours: "8:00-19:00"
+    rules: 可用于派发传单、设点咨询、宣传等，同一时段可支持 4 个组织开展活动。
+  - id: yh-tingshan-front
+    name: 听山餐厅前空地
+    campus: 粤海
+    kind: 室外
+    hours: "8:00-19:00"
+    rules: 可用于派发传单、设点咨询、宣传等，同一时段可支持 4 个组织开展活动。
+  - id: yh-zhaiqu-canteen-front
+    name: 斋区食堂前空地
+    campus: 粤海
+    kind: 室外
+    hours: "8:00-19:00"
+    rules: 可用于派发传单、设点咨询、宣传等，同一时段可支持 4 个组织开展活动。
+  - id: yh-zhaiqu-stairs-front
+    name: 斋区宿舍大阶梯前空地
+    campus: 粤海
+    kind: 室外
+    hours: "8:00-19:00"
+    rules: 可用于派发传单、设点咨询、宣传等，同一时段可支持 4 个组织开展活动。
+  - id: yh-youth-square
+    name: 青年广场
+    aliases: [石头坞广场]
+    campus: 粤海
+    kind: 室外
+    hours: "8:30-12:00, 14:00-17:00, 19:00-21:30"
+    rules: 可用于举办文化节、晚会等大型活动；周一至周四不得使用扩音设备或举行晚会等大型活动；周五 18:00-22:00 可使用扩音设备及举办晚会，周六周日不限制。
+  - id: yh-swzx-square
+    name: 事务中心前广场
+    campus: 粤海
+    kind: 室外
+    hours: "8:30-12:00, 14:00-17:00, 19:00-21:30"
+    rules: 可用于举办文化节、晚会等大型活动；周一至周四不得使用扩音设备或举行晚会等大型活动；周五 18:00-22:00 可使用扩音设备及举办晚会，周六周日不限制。
+
+  # ---------------- 丽湖 · 室外 ----------------
+  - id: lh-zhengyi-square
+    name: 正义广场
+    campus: 丽湖
+    kind: 室外
+    hours: "8:30-12:00, 14:00-17:00, 19:00-21:30"
+    rules: 可用于举办文化节、小型演出、展览、派发传单等活动（仅周五 18:00-22:00、周末及节假日可使用扩音设备）。
+  - id: lh-qinggangli-square
+    name: 青冈栎、三角梅广场
+    aliases: [青冈栎广场, 三角梅广场]
+    campus: 丽湖
+    kind: 室外
+    hours: "8:30-12:00, 14:00-17:00, 19:00-21:30"
+    rules: 可用于举办文化节、小型演出、展览、派发传单等活动（仅周五 18:00-22:00、周末及节假日可使用扩音设备）。
+  - id: lh-qiming-1f
+    name: 启明楼一楼广场
+    campus: 丽湖
+    kind: 室外
+    hours: "8:00-19:00"
+    rules: 可用于展览、派发传单、设点咨询、宣传等不产生噪音的活动，同一时段仅支持 2 个组织开展活动。
+  - id: lh-zhichang-2f
+    name: 至畅体育馆二楼平台
+    campus: 丽湖
+    kind: 室外
+    hours: "8:00-19:00"
+    rules: 可用于趣味运动会、展览、派发传单、设点咨询、宣传等活动。
+  - id: lh-canteen-doors
+    name: 各餐厅门口
+    campus: 丽湖
+    kind: 室外
+    hours: "8:00-19:00"
+    rules: 可用于展览、派发传单、设点咨询、宣传等不产生噪音的活动。
+
+  # ---------------- 粤海 · 室内 ----------------
+  - id: yh-fenghuai-101
+    name: 风槐斋 101
+    campus: 粤海
+    kind: 室内
+    hours: "9:00-21:00"
+    capacity: 30
+    rules: 约 170 平米，配置 32 人位自习桌椅和 30 人位可移动会议桌椅，可满足自习研讨、30 人以内会议需求。
+  - id: yh-ziwei-101-102
+    name: 紫薇斋 101、102
+    aliases: [沙盘室]
+    campus: 粤海
+    kind: 室内
+    hours: "9:00-21:00"
+    rules: 101 配有沙盘游戏设备，支持校内教工及心理相关社团、组织开展沙盘个人/团体教学活动（须提供沙盘游戏相关培训合格证书）。禁止使用公共设施开展商业活动。
+  - id: yh-ziwei-104
+    name: 紫薇斋 104 编程开发室
+    campus: 粤海
+    kind: 室内
+    hours: "9:00-21:00"
+    rules: 编程开发室，配有电脑设备与诸多编程开发相关书籍，用于培养学生编程开发技能与举办编程开发交流活动。
+  - id: yh-ziwei-105
+    name: 紫薇斋 105 摄影展览室
+    aliases: [摄影棚]
+    campus: 粤海
+    kind: 室内
+    hours: "9:00-21:00"
+    rules: 摄影展览室，配备有绿幕等一系列拍摄设备，用于培养学生拍摄技能、开展活动拍摄、产品拍摄培训等学生活动。
+  - id: yh-ziwei-106
+    name: 紫薇斋 106
+    campus: 粤海
+    kind: 室内
+    hours: "9:00-21:00"
+    rules: 可组织党建相关的活动。
+  - id: yh-ziwei-108
+    name: 紫薇斋 108
+    campus: 粤海
+    kind: 室内
+    hours: "9:00-21:00"
+    rules: 配备有沙发桌椅和书籍，用于学生学习、讨论以及举行小型团建活动。
+  - id: yh-ziwei-109
+    name: 紫薇斋 109
+    campus: 粤海
+    kind: 室内
+    hours: "9:00-21:00"
+    rules: 配备有沙发桌椅和书籍，用于学生学习、阅读书籍及举办阅读分享讨论活动。
+  - id: yh-chundi-dance
+    name: 春笛舞蹈室
+    campus: 粤海
+    kind: 室内
+    hours: "9:00-22:00"
+    rules: 全木地板，灯光明亮，可供瑜伽练习、舞蹈排练、社团交流等活动。
+  - id: yh-youlin-3f-meeting
+    name: 友邻共享空间 3 楼会议室
+    aliases: [沧海书吧会议室, 友邻共享空间阶梯沙龙]
+    campus: 粤海
+    kind: 室内
+    location: 沧海书吧 3 楼
+    hours: "9:00-22:00"
+    capacity: 20
+    rules: 可举办 20 人以内会议。友邻共享空间阶梯沙龙：阶梯座位，可举办 50 人以内的小型讲座、沙龙活动。
+  - id: yh-youlin-2f-room-1
+    name: 友邻共享空间 2 楼交流室 1
+    campus: 粤海
+    kind: 室内
+    location: 沧海书吧 2 楼
+    hours: "9:00-21:00"
+    capacity: 2
+    rules: 配有桌子 1 张，椅子 2 把，可召开小型会议。
+  - id: yh-youlin-2f-room-2
+    name: 友邻共享空间 2 楼交流室 2
+    campus: 粤海
+    kind: 室内
+    location: 沧海书吧 2 楼
+    hours: "9:00-21:00"
+    capacity: 2
+    rules: 配有桌子 1 张，椅子 2 把，可召开小型会议。
+  - id: yh-youlin-2f-room-3
+    name: 友邻共享空间 2 楼交流室 3
+    campus: 粤海
+    kind: 室内
+    location: 沧海书吧 2 楼
+    hours: "9:00-21:00"
+    capacity: 2
+    rules: 配有桌子 1 张，椅子 2 把，可召开小型会议。
+  - id: yh-youlin-theater
+    name: 友邻共享空间剧场
+    campus: 粤海
+    kind: 室内
+    location: 沧海书吧 3 楼
+    hours: "9:00-21:00"
+    capacity: 50
+    rules: 配备专业音响设备，可举办 50 人以内的电影放映、舞蹈表演等活动。
+
+  # ---------------- 丽湖 · 室内 ----------------
+  - id: lh-huyanglin-214
+    name: 胡杨林 214 报告厅
+    campus: 丽湖
+    kind: 室内
+    hours: "9:00-12:00, 14:30-22:00"
+    capacity: 100
+    rules: 小型报告厅，面积约 150 平米，配备电子屏，折叠椅 90 张，适合举办中型讲座、课程（100 人以内）。
+  - id: lh-shanzhashu-201
+    name: 丽湖山楂树活动室 201
+    campus: 丽湖
+    kind: 室内
+    hours: "9:00-12:00, 14:30-22:00"
+    capacity: 12
+    rules: 小型活动室，面积约 36 平米，配备 6 人位固定桌椅 2 套。适合自习和小型学习沙龙。
+  - id: lh-shanzhashu-202
+    name: 丽湖山楂树活动室 202
+    campus: 丽湖
+    kind: 室内
+    hours: "9:00-12:00, 14:30-22:00"
+    rules: 小型活动室，面积约 60 平米，配备有 7 座沙发、固定桌椅（8 座），适合自习、研讨、小型学习沙龙。
+  - id: lh-shanzhashu-204
+    name: 丽湖山楂树活动室 204
+    campus: 丽湖
+    kind: 室内
+    hours: "9:00-12:00, 14:30-22:00"
+    capacity: 16
+    rules: 小型活动室，面积约 60 平米，配备可移动会议桌 8 张，可移动会议椅 16 张，单人位沙发 6 张，一体机，可供自习、会议研讨、沙龙授课。
+  - id: lh-shanzhashu-206
+    name: 丽湖山楂树活动室 206
+    campus: 丽湖
+    kind: 室内
+    hours: "9:00-12:00, 14:30-22:00"
+    rules: 小型活动室，面积约 50 平米，有 8 座、6 座沙发各 1 套，可移动自习桌椅若干，可供阅读、自习、小型研讨。
+  - id: lh-shanzhashu-207
+    name: 丽湖山楂树活动室 207
+    campus: 丽湖
+    kind: 室内
+    hours: "9:00-12:00, 14:30-22:00"
+    rules: 小型活动室，约 60 平米，具备 2 人座沙发 4 套，固定桌椅若干，适合自习及小型沙龙。
+  - id: lh-shanzhashu-209
+    name: 丽湖山楂树活动室 209
+    campus: 丽湖
+    kind: 室内
+    hours: "9:00-12:00, 14:30-22:00"
+    capacity: 30
+    rules: 小型活动室，面积约 80 平米，配备固定桌、椅、白板，可举办 30 人以内会议。
+  - id: lh-qinggangli-301
+    name: 丽湖青冈栎党建活动室 301
+    campus: 丽湖
+    kind: 室内
+    location: 洗星社区青冈栎三楼
+    hours: "9:00-22:00"
+    capacity: 30
+    rules: 小型活动室，约 50 平米，具备可移动会议桌椅，可举办 30 人以内小型会议。
+  - id: lh-qinggangli-302
+    name: 丽湖青冈栎研讨室 302
+    campus: 丽湖
+    kind: 室内
+    location: 洗星社区青冈栎三楼
+    hours: "9:00-22:00"
+    capacity: 9
+    rules: 青冈栎三楼活动空间，共 9 个座位。
+  - id: lh-qinggangli-303
+    name: 丽湖青冈栎研讨室 303
+    campus: 丽湖
+    kind: 室内
+    location: 洗星社区青冈栎三楼
+    hours: "9:00-22:00"
+    capacity: 20
+    rules: 青冈栎三楼活动空间，共 20 个座位。
+  - id: lh-qinggangli-304
+    name: 丽湖青冈栎研讨室 304
+    campus: 丽湖
+    kind: 室内
+    location: 洗星社区青冈栎三楼
+    hours: "9:00-22:00"
+    capacity: 15
+    rules: 青冈栎三楼活动空间，共 15 个座位。
+  - id: lh-qinggangli-305
+    name: 丽湖青冈栎研讨室 305
+    campus: 丽湖
+    kind: 室内
+    location: 洗星社区青冈栎三楼
+    hours: "9:00-22:00"
+    capacity: 9
+    rules: 青冈栎三楼活动空间，共 9 个座位。

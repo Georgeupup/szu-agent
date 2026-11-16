@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>荔园助手</title>
+  <meta name="theme-color" content="#3f8fe0">
+  <link rel="icon" href="/static/lychee.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/scene.js"></script>
+</head>
+<body>
+  <!-- 动态背景：天空 + 荔枝林（scene.js 生成），上面一层磨砂 -->
+  <div id="scene" aria-hidden="true"></div>
+  <div class="frost" aria-hidden="true"></div>
+  <!-- 荔枝标志：全站复用 -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="lychee" viewBox="0 0 32 32">
+      <path d="M16.2 9.5c-.1-2.2.5-4 1.7-5.6" fill="none" stroke="var(--stem)" stroke-width="1.6" stroke-linecap="round"/>
+      <path d="M17.6 6.4c2.4-3.2 6.6-4 10.2-3.1-1.2 3.7-5.4 5.6-10.2 3.1z" fill="var(--leaf)"/>
+      <circle cx="16" cy="19.5" r="10" fill="var(--lychee)"/>
+      <g fill="var(--lychee-dark)">
+        <circle cx="11.5" cy="15.5" r="1.1"/><circle cx="16" cy="13.6" r="1.1"/><circle cx="20.5" cy="15.5" r="1.1"/>
+        <circle cx="9.6" cy="20" r="1.1"/><circle cx="14" cy="18.4" r="1.1"/><circle cx="18.4" cy="18.6" r="1.1"/><circle cx="22.6" cy="20.2" r="1.1"/>
+        <circle cx="11.8" cy="23.6" r="1.1"/><circle cx="16.2" cy="23" r="1.1"/><circle cx="20.4" cy="24.2" r="1.1"/><circle cx="15.6" cy="27.2" r="1.1"/>
+      </g>
+      <ellipse cx="12" cy="14.6" rx="2.6" ry="1.5" transform="rotate(-30 12 14.6)" fill="#fff" opacity=".28"/>
+    </symbol>
+  </svg>
+
+  <header class="topbar">
+    <button class="icon-btn" id="newChat" title="新对话" aria-label="新对话">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z"/></svg>
+    </button>
+    <nav class="seg" role="tablist" aria-label="视图">
+      <button role="tab" class="on" data-view="chat" aria-selected="true">聊天</button>
+      <button role="tab" data-view="history" aria-selected="false">历史</button>
+      <button role="tab" data-view="memory" aria-selected="false">记忆</button>
+    </nav>
+    <div class="topbar-right">
+      <span class="mode-chip" id="modeChip" hidden>演示数据</span>
+      <button class="avatar" id="accountBtn" aria-label="账号与登录"><svg width="22" height="22"><use href="#lychee"/></svg><span class="auth-dot"></span></button>
+    </div>
+  </header>
+
+  <aside class="side" aria-label="今日">
+    <div class="clock">
+      <div id="clockDow">周五</div>
+      <div id="clockDate">11月13日</div>
+      <div id="clockTime" class="num">10:18</div>
+    </div>
+    <section class="today" id="today">
+      <div id="weather" class="weather"><span class="skeleton"></span></div>
+    </section>
+  </aside>
+
+  <main>
+    <section id="chatView" class="column" aria-live="polite">
+      <div class="empty" id="empty">
+        <svg class="empty-mark" width="44" height="44"><use href="#lychee"/></svg>
+        <h1 id="greeting">你好，今天想做点什么？</h1>
+        <p>我能帮你找校园活动、约体育场馆、查宿舍电费，也能查课表和图书馆。</p>
+        <div class="suggests">
+          <button class="pill" data-q="这周末有什么社团活动？">这周末有什么社团活动？</button>
+          <button class="pill" data-q="帮我约周日晚上 8 点的羽毛球">帮我约周日晚上的羽毛球</button>
+          <button class="pill" data-q="我宿舍还剩多少电？">我宿舍还剩多少电？</button>
+          <button class="pill" data-q="今天有什么课？">今天有什么课？</button>
+        </div>
+      </div>
+      <div class="log" id="log"></div>
+    </section>
+
+    <section id="historyView" class="column" hidden>
+      <div class="memory-head">
+        <h1>历史对话</h1>
+        <p id="historyNote">保存在你自己的电脑上，超过 30 天自动删除。登录密码和验证码从不进入对话，所以也不会出现在这里。</p>
+      </div>
+      <div id="threadList" class="memory-list"></div>
+    </section>
+
+    <section id="memoryView" class="column" hidden>
+      <div class="memory-head">
+        <h1>荔园助手记得的事</h1>
+        <p>只保存在你自己的电脑上。学号、姓名、密码这类信息不会被记录。</p>
+      </div>
+      <h2 class="mem-section">账号</h2>
+      <div id="account" class="memory-list"></div>
+      <h2 class="mem-section">偏好</h2>
+      <div id="memoryList" class="memory-list"></div>
+    </section>
+  </main>
+
+  <form class="composer" id="composer" autocomplete="off">
+    <textarea id="input" rows="1" placeholder="给荔园助手发消息" aria-label="消息"></textarea>
+    <button type="submit" class="send" id="send" aria-label="发送" disabled>
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5.5 11.5 12 5l6.5 6.5"/></svg>
+    </button>
+  </form>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
