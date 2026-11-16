@@ -71,6 +71,11 @@
     <div class="legend"><span style="--c: var(--hit)">输入·缓存命中</span><span style="--c: var(--miss)">输入·未命中</span><span style="--c: var(--out)">输出</span></div>
   </section>
 
+  <section class="card" id="users-card" hidden>
+    <h2 id="users-h">按用户</h2>
+    <div class="scroll"><table id="users"></table></div>
+  </section>
+
   <section class="card">
     <h2>花费最多的对话</h2>
     <div class="scroll"><table id="threads"></table></div>
@@ -118,6 +123,16 @@ async function load(days) {
       </div>
       <span class="num">${yuan(d.cost)} · 命中 ${pct(d.hitRate)}</span></div>`).join("")
     : `<div class="empty">这段时间还没有模型调用</div>`;
+
+  const us = r.byUser || [];
+  $("users-card").hidden = !r.byUser;
+  if (r.byUser) {
+    $("users-h").textContent = `按用户（共 ${r.users ?? us.length} 人${r.quota ? `，每人每天限额 ¥${r.quota.limitCny}` : ""}）`;
+    $("users").innerHTML = us.length ? `<tr><th>用户</th><th class="num">调用</th><th class="num">输入</th><th class="num">命中率</th><th class="num">输出</th><th class="num">花费</th><th>最近使用</th></tr>` +
+      us.map((x) => `<tr><td><code>${esc(x.user)}</code></td><td class="num">${x.calls}</td><td class="num">${fmt(x.input)}</td>
+        <td class="num">${pct(x.hitRate)}</td><td class="num">${fmt(x.output)}</td><td class="num">${yuan(x.cost)}</td><td>${when(x.last_ts)}</td></tr>`).join("")
+      : `<tr><td class="empty">暂无</td></tr>`;
+  }
 
   $("threads").innerHTML = r.threads.length ? `<tr><th>对话</th><th class="num">调用</th><th class="num">输入</th><th class="num">命中率</th><th class="num">输出</th><th class="num">花费</th></tr>` +
     r.threads.map((x) => `<tr><td class="t">${esc(x.title)}</td><td class="num">${x.calls}</td><td class="num">${fmt(x.input)}</td>

@@ -478,6 +478,11 @@ async function streamPost(url, body, onEvent) {
     res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   } catch (e) { onEvent({ type: "error", message: "连不上服务，确认 szu-agent-web 还在运行" }); return true; }
   if (res.status === 409) { const j = await res.json().catch(() => ({})); onEvent({ type: "error", message: j.detail || "上一条消息还在处理中" }); return true; }
+  if (res.status === 429) { // 每日额度用完（JSON），或者 Nginx 限流（发得太快，返回的是 HTML）
+    const j = await res.json().catch(() => null);
+    onEvent({ type: "error", message: j?.detail?.message || "发得太快了，稍等几秒再试" });
+    return true;
+  }
   if (!res.ok) { onEvent({ type: "error", message: `请求失败（${res.status}）` }); return true; }
   const reader = res.body.getReader();
   const dec = new TextDecoder();
@@ -581,11 +586,31 @@ async function runTurn(url, body) {
   else if (mfaTarget) addMfaCard({ target: mfaTarget, resume: true });
   else if (needContact) addContactCard({ resume: true });
   if (touched.has("remember_user_info") || touched.has("electricity_query") || touched.has("sports_reserve_confirm")) loadToday();
+  refreshQuota();
+}
+
+// 输入框下的额度圆环：每轮对话结束后刷新
+async function refreshQuota() {
+  const box = $("#quota");
+  const r = await fetch("/api/quota").then((x) => (x.ok ? x.json() : null)).catch(() => null);
+  quota = r?.enabled ? r : null;
+  $("#composer").classList.toggle("has-quota", !!quota);
+  box.hidden = !quota;
+  updateSend();
+  if (!quota) return;
+  const frac = Math.max(0, Math.min(1, quota.remainingCny / quota.limitCny));
+  const C = 2 * Math.PI * 6;
+  const arc = box.querySelector(".arc");
+  arc.style.strokeDasharray = C; arc.style.strokeDashoffset = C * (1 - frac);
+  box.classList.toggle("low", frac < 0.2); box.classList.toggle("out", !!quota.exhausted);
+  box.querySelector("span").textContent = quota.exhausted ? "今日额度已用完，0 点恢复" : `今日额度剩 ${Math.round(frac * 100)}%`;
+  box.title = `今天已用 ¥${quota.usedCny.toFixed(3)} / ¥${quota.limitCny}，北京时间 0 点恢复`;
 }
 
 async function ask(text) {
   text = text.trim();
   if (!text || busy) return;
+  if (quota?.exhausted) { addError("今天的额度用完了，北京时间明天 0 点恢复"); return; }
   if (multiuser && !auth.appSession) { switchView("chat"); addLoginCard({ resume: false }); return; } // 输入框里的字留着，登录后再发
   // 还没点的确认卡片在发新消息后作废（后端会把那次操作记为“未确认、未执行”）
   log.querySelectorAll(".confirm .actions").forEach((a) => {
@@ -749,6 +774,7 @@ async function openThread(id) {
 // ---------------- 登录 ----------------
 // 密码只通过 /api/auth/password 发给本机后端，再由后端发给深大统一认证；不会进入对话，也不会发给 AI 模型。
 let auth = { loggedIn: false };
+let quota = null;     // 每日额度（多人模式默认每人每天 ¥0.5）；没开就是 null
 let multiuser = false; // 部署到服务器给多人用：先用学校统一认证登录爱小荔，每个人的记忆和历史分开
 let activeLogin = null; // 同一时间只保留一张可用的登录卡片
 
@@ -1008,7 +1034,7 @@ function renderAccount() {
 
 // ---------------- 输入 ----------------
 function autosize() { input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight, 160) + "px"; }
-function updateSend() { send.disabled = busy || !input.value.trim(); }
+function updateSend() { send.disabled = busy || !input.value.trim() || !!quota?.exhausted; }
 
 input.addEventListener("input", () => { autosize(); updateSend(); });
 input.addEventListener("keydown", (e) => {
@@ -1037,6 +1063,7 @@ Promise.all([refreshAuth(), fetch("/api/meta").then((r) => r.json()).catch(() =>
   const where = multiuser ? "保存在服务器上，只有你自己能看到" : "保存在你自己的电脑上";
   $("#historyNote").textContent = `${where}，${m.historyDays > 0 ? `超过 ${m.historyDays} 天自动删除` : "不会自动删除"}。登录密码和验证码从不进入对话，所以也不会出现在这里。`;
   if (multiuser && !auth.appSession) addLoginCard({ resume: false });
+  else refreshQuota();
 });
 restore();
 loadToday();

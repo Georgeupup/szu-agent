@@ -60,7 +60,6 @@ bash setup-server.sh <服务器公网IP>
 
 ## 致谢与声明
 
-- 公文通、图书馆、讲座、课表、电费的解析规则移植自 [szu-cli](https://github.com/AwesomeHou/szu-cli)（MIT License）
 - 宿舍电费的查询协议参考 [szu-dianchacha](https://github.com/yuyiwei01/szu-dianchacha)（MIT License）
 - 健身房预约接口参考 [szu_gym_helper](https://github.com/Georgeupup/szu_gym_helper)
 

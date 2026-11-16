@@ -22,7 +22,7 @@ from typing import Any
 from langchain_core.messages import AIMessage
 
 from ..campus.session import agent_home
-from .pricing import cost_cny, is_peak
+from .pricing import CST, cost_cny, is_peak
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS llm_calls (
@@ -51,6 +51,12 @@ _SUMS = """COUNT(*) AS calls,
     COALESCE(SUM(reasoning_tokens), 0) AS reasoning, SUM(cost_cny) AS cost,
     SUM(input_tokens IS NULL) AS no_usage, SUM(cost_cny IS NULL AND input_tokens IS NOT NULL) AS unpriced,
     CAST(AVG(latency_ms) AS INTEGER) AS avg_latency_ms"""
+
+
+def beijing_day_start(now: datetime | None = None) -> datetime:
+    """北京时间今天 0 点（带时区）。每日限额按北京时间的自然日算。"""
+    t = (now or datetime.now(timezone.utc)).astimezone(CST)
+    return t.replace(hour=0, minute=0, second=0, microsecond=0)
 
 
 def extract_usage(msg: Any) -> dict[str, int] | None:
@@ -105,6 +111,14 @@ class UsageStore:
                  *((u["input"], u["hit"], u["miss"], u["output"], u["reasoning"]) if u else (None,) * 5),
                  latency_ms, int(is_peak(at)), cost))
 
+    def spent_today(self, user_id: str, *, now: datetime | None = None) -> float:
+        """这个用户北京时间今天已经花了多少元（回答 + 压缩历史都算）。没配价格的模型记为 0。"""
+        since = beijing_day_start(now).astimezone(timezone.utc).isoformat(timespec="seconds")
+        with self._connect() as db:
+            row = db.execute("SELECT COALESCE(SUM(cost_cny), 0) FROM llm_calls WHERE user_id = ? AND ts >= ?",
+                             (user_id, since)).fetchone()
+        return float(row[0])
+
     def delete_user(self, user_id: str) -> None:
         with self._lock, self._connect() as db:
             db.execute("DELETE FROM llm_calls WHERE user_id = ?", (user_id,))
@@ -126,9 +140,12 @@ class UsageStore:
                 f"SELECT thread_id, MIN(ts) AS first_ts, MAX(ts) AS last_ts, {_SUMS} FROM llm_calls"
                 " WHERE ts >= ? AND thread_id IS NOT NULL GROUP BY thread_id ORDER BY cost DESC, input DESC LIMIT ?",
                 (since, top))]
+            by_user = [_row(r) for r in db.execute(
+                f"SELECT user_id, MAX(ts) AS last_ts, {_SUMS} FROM llm_calls WHERE ts >= ?"
+                " GROUP BY user_id ORDER BY cost DESC, input DESC LIMIT ?", (since, top))]
             recent = [_row(r) for r in db.execute(
                 "SELECT ts, thread_id, purpose, model, input_tokens AS input, cache_hit_tokens AS hit,"
                 " cache_miss_tokens AS miss, output_tokens AS output, latency_ms, peak, cost_cny AS cost"
                 " FROM llm_calls ORDER BY id DESC LIMIT 20")]
         return {"days": days, "total": total, "byPurpose": by_purpose, "daily": daily, "threads": threads,
-                "recent": recent}
+                "byUser": by_user, "recent": recent}
