@@ -295,7 +295,7 @@ def create_app(*, mock: bool | None = None, llm: BaseChatModel | None = None, pr
             await turns.shutdown()
             await pool.aclose()
 
-    app = FastAPI(title="荔园助手", lifespan=lifespan)
+    app = FastAPI(title="爱小荔", lifespan=lifespan)
     turns = TurnRunner()
     multi = users.multiuser()
     accounts = AccountStore() if multi else None
@@ -320,7 +320,7 @@ def create_app(*, mock: bool | None = None, llm: BaseChatModel | None = None, pr
     def current_user(request: Request) -> str:
         uid = optional_user(request)
         if uid is None:
-            raise HTTPException(401, detail={"code": "APP_LOGIN_REQUIRED", "message": "请先登录荔园助手"})
+            raise HTTPException(401, detail={"code": "APP_LOGIN_REQUIRED", "message": "请先登录爱小荔"})
         return uid
 
     def store_of(user_id: str) -> SessionStore:
@@ -352,7 +352,7 @@ def create_app(*, mock: bool | None = None, llm: BaseChatModel | None = None, pr
         set_session_cookie(response, request, accounts.login(uid))
 
     # 多人模式登录时“识别身份”这一步遇到学校二次验证：mfaId -> 临时凭证文件。
-    # 这时还没有应用会话（正是要靠这次登录建立），所以这类验证流程不要求登录荔园助手，
+    # 这时还没有应用会话（正是要靠这次登录建立），所以这类验证流程不要求登录爱小荔，
     # 凭 mfaId（随机、只发给发起登录的那个浏览器）继续；验证通过后再识别身份、签发会话。
     login_mfa: dict[str, SessionStore] = {}
 
@@ -544,7 +544,7 @@ def create_app(*, mock: bool | None = None, llm: BaseChatModel | None = None, pr
     @app.get("/api/auth")
     async def auth_status(request: Request):
         uid = optional_user(request)
-        if uid is None:  # 多人模式还没登录荔园助手
+        if uid is None:  # 多人模式还没登录爱小荔
             return {"loggedIn": False, "appSession": False}
         res = await _call_tool(rt(), "auth_status", {}, uid)
         data = res.get("data") if res.get("ok") else {"loggedIn": False, **store_of(uid).info(), "error": res.get("error")}
@@ -574,7 +574,7 @@ def create_app(*, mock: bool | None = None, llm: BaseChatModel | None = None, pr
             return store_of(users.LOCAL), False
         if realm == "webvpn":
             if uid is None:
-                raise HTTPException(401, detail={"code": "APP_LOGIN_REQUIRED", "message": "请先登录荔园助手"})
+                raise HTTPException(401, detail={"code": "APP_LOGIN_REQUIRED", "message": "请先登录爱小荔"})
             return store_of(uid), False
         return pending_store(), True
 
@@ -860,7 +860,7 @@ def main() -> None:
     import uvicorn
 
     load_dotenv()
-    parser = argparse.ArgumentParser(description="荔园助手 Web 界面")
+    parser = argparse.ArgumentParser(description="爱小荔 Web 界面")
     parser.add_argument("--mock", action="store_true", help="使用 mock 数据")
     parser.add_argument("--host", default=default_host(),
                         help="监听地址。默认 127.0.0.1；在 Docker 容器里默认 0.0.0.0（否则端口映射进不来）")
@@ -868,7 +868,7 @@ def main() -> None:
     args = parser.parse_args()
 
     if not port_available(args.host, args.port):
-        print(f"端口 {args.port} 已被其他程序占用（可能是之前开的荔园助手还没关）。", file=sys.stderr)
+        print(f"端口 {args.port} 已被其他程序占用（可能是之前开的爱小荔还没关）。", file=sys.stderr)
         print(f"  换个端口：szu-agent-web --port {args.port + 1}", file=sys.stderr)
         if sys.platform == "win32":
             print(f"  查看占用者：Get-Process -Id (Get-NetTCPConnection -LocalPort {args.port}).OwningProcess", file=sys.stderr)
@@ -878,7 +878,7 @@ def main() -> None:
 
     # 0.0.0.0 是“监听所有网卡”，不是能在浏览器里打开的地址
     shown = "localhost" if args.host in ("0.0.0.0", "::") else args.host
-    print(f"荔园助手已启动：http://{shown}:{args.port}", flush=True)
+    print(f"爱小荔已启动：http://{shown}:{args.port}", flush=True)
     if args.host not in ("127.0.0.1", "localhost", "::1"):
         print(f"  正在监听 {args.host}：同一网络里的其他设备也能访问这个页面（它能使用你的校园登录凭证）。", flush=True)
         if in_container():

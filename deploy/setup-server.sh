@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 荔园助手一键部署（Ubuntu 22.04 / 24.04，root 运行，可重复执行）
+# 爱小荔一键部署（Ubuntu 22.04 / 24.04，root 运行，可重复执行）
 #
 #   本机：tar 打包项目（排除 .venv/.venv-win/.env/resource/缓存）→ scp 到服务器 /tmp/szu-agent-upload.tgz
 #         .env 单独 scp 到 /tmp/szu-agent.env（只有第一次需要）

@@ -6,7 +6,7 @@
 
 | 变量 | 必填 | 说明 |
 |---|---|---|
-| `SZU_AGENT_MULTIUSER=1` | 是 | 开启多人模式：先用学校统一认证登录荔园助手，每人的数据分开 |
+| `SZU_AGENT_MULTIUSER=1` | 是 | 开启多人模式：先用学校统一认证登录爱小荔，每人的数据分开 |
 | `SZU_AGENT_SECRET` | 强烈建议 | 算 user_id 的服务器密钥（任意长随机串，如 `python -c "import secrets;print(secrets.token_hex(32))"`）。不设会在数据目录生成 `secret.key`。**部署后不要换、要备份**：换了所有人的 user_id 都会变，等于数据全部丢失 |
 | `SZU_AGENT_COOKIE_SECURE=1` | HTTPS 时 | 会话 Cookie 加 Secure 标记（反向代理后面应用看到的是 http，要显式打开） |
 | `SZU_AGENT_ADMINS` | 否 | 能看 `/usage` 的 user_id，逗号分隔。自己登录后打开 `/api/me` 看到的 `userId` 就是 |

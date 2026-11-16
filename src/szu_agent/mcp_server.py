@@ -130,7 +130,7 @@ class RoutedCampus:
         uid = self._user()
         if not uid or not valid_user_id(uid) or (self._strict and uid == LOCAL):
             async def refuse(*_a: Any, **_k: Any) -> Any:
-                raise CampusError("LOGIN_REQUIRED", "请先登录荔园助手")
+                raise CampusError("LOGIN_REQUIRED", "请先登录爱小荔")
             return refuse
         return getattr(self._pool.get(uid), name)
 

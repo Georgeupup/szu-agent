@@ -28,7 +28,7 @@ def test_chat_confirm_resume_history(logged_in, home):
     profile = ProfileStore(home / "p.json")
     with TestClient(create_app(mock=True, llm=llm, profile=profile)) as client:
         assert client.get("/api/meta").json() == {"mock": True, "historyDays": 30, "multiuser": False}
-        assert "荔园助手" in client.get("/").text
+        assert "爱小荔" in client.get("/").text
 
         with client.stream("POST", "/api/chat", json={"thread_id": "w1", "message": "约羽毛球"}) as r:
             evs = events(r)

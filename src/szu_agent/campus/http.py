@@ -182,7 +182,7 @@ class CampusHttp:
             elif host in OFFCAMPUS_UNAVAILABLE or host.startswith(("192.168.", "10.", "172.16.")):
                 # 校外连内网 IP 必然失败，不用等超时；WebVPN 也不提供这些系统（电费 SIMS 实测打不开）
                 raise CampusError("NETWORK_REQUIRED", f"这个系统（{host}）只在校园网内开放，学校 WebVPN 也不提供，"
-                                  "服务器版用不了。请在校园网下（或校外登录学校 SecureLink 零信任后）使用本机版荔园助手")
+                                  "服务器版用不了。请在校园网下（或校外登录学校 SecureLink 零信任后）使用本机版爱小荔")
         intranet = is_intranet(host)
         if intranet:
             # 内网系统连不上时通常是根本不在校园网里，不必傻等 30 秒

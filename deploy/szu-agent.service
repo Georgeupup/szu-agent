@@ -1,4 +1,4 @@
-# 荔园助手真实服务（多人模式由 drop-in 打开：/etc/systemd/system/szu-agent.service.d/multiuser.conf，setup-server.sh 生成）
+# 爱小荔真实服务（多人模式由 drop-in 打开：/etc/systemd/system/szu-agent.service.d/multiuser.conf，setup-server.sh 生成）
 [Unit]
 Description=szu-agent web
 After=network-online.target

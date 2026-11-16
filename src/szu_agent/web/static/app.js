@@ -1,4 +1,4 @@
-// 荔园助手前端：无框架、无构建、无 CDN 依赖
+// 爱小荔前端：无框架、无构建、无 CDN 依赖
 "use strict";
 
 const $ = (s) => document.querySelector(s);
@@ -749,7 +749,7 @@ async function openThread(id) {
 // ---------------- 登录 ----------------
 // 密码只通过 /api/auth/password 发给本机后端，再由后端发给深大统一认证；不会进入对话，也不会发给 AI 模型。
 let auth = { loggedIn: false };
-let multiuser = false; // 部署到服务器给多人用：先用学校统一认证登录荔园助手，每个人的记忆和历史分开
+let multiuser = false; // 部署到服务器给多人用：先用学校统一认证登录爱小荔，每个人的记忆和历史分开
 let activeLogin = null; // 同一时间只保留一张可用的登录卡片
 
 async function refreshAuth() {
@@ -990,7 +990,7 @@ function renderAccount() {
   if (multiuser && auth.appSession) {
     const row = el("div", "mem", '<span class="k">我的数据</span><span class="v" style="color:var(--muted)">对话、记忆、联系手机、学校登录状态</span><button>全部删除</button>');
     row.querySelector("button").onclick = async () => {
-      if (!confirm("删除你在荔园助手服务器上的全部数据？对话历史、记忆、联系手机、学校登录状态都会删除，不能恢复。")) return;
+      if (!confirm("删除你在爱小荔服务器上的全部数据？对话历史、记忆、联系手机、学校登录状态都会删除，不能恢复。")) return;
       const r = await fetch("/api/me", { method: "DELETE" }).catch(() => null);
       if (r?.ok) location.reload(); else alert((await r?.json().catch(() => null))?.detail || "删除失败，请稍后再试");
     };

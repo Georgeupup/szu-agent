@@ -80,7 +80,7 @@ async def check_sports(out=print) -> None:
     except CampusError as exc:
         out(f"\n✗ {exc.code}: {exc.message}")
         if exc.code in ("LOGIN_REQUIRED", "MFA_REQUIRED"):
-            out("  先在荔园助手界面上登录 / 完成二次验证，再运行一次")
+            out("  先在爱小荔界面上登录 / 完成二次验证，再运行一次")
     except (ValueError, json.JSONDecodeError) as exc:
         out(f"\n✗ 学校返回的不是 JSON：{exc}")
     finally:
@@ -126,7 +126,7 @@ async def check_library(ctrlno: str = "3351727", out=print) -> None:
     except CampusError as exc:
         out(f"\n✗ {exc.code}: {exc.message}")
         if exc.code in ("LOGIN_REQUIRED", "MFA_REQUIRED"):
-            out("  先在荔园助手界面上登录 / 完成二次验证，再运行一次")
+            out("  先在爱小荔界面上登录 / 完成二次验证，再运行一次")
     finally:
         await http.aclose()
 
@@ -239,7 +239,7 @@ async def check_booth(out=print) -> None:
     except CampusError as exc:
         out(f"\n✗ {exc.code}: {exc.message}")
         if exc.code in ("LOGIN_REQUIRED", "MFA_REQUIRED"):
-            out("  先在荔园助手界面上登录 / 完成二次验证，再运行一次")
+            out("  先在爱小荔界面上登录 / 完成二次验证，再运行一次")
         if exc.code == "NETWORK_REQUIRED":
             out("  这个系统只能在校园网里访问，连上校园网再运行一次")
     except (ValueError, json.JSONDecodeError) as exc:

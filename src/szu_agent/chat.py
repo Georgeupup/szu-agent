@@ -77,7 +77,7 @@ def _show_update(update: dict) -> None:
                         continue
                     console.print(f"  [dim]🔧 {tc['name']}({_fmt_args(tc['args'])})[/dim]")
                 if msg.content and not msg.tool_calls:
-                    console.print(Panel(Markdown(message_text(msg)), title="荔园助手", border_style="green"))
+                    console.print(Panel(Markdown(message_text(msg)), title="爱小荔", border_style="green"))
             elif isinstance(msg, ToolMessage):
                 text = message_text(msg)
                 ok = '"ok": false' not in text and '"ok":false' not in text

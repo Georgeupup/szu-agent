@@ -74,7 +74,7 @@ def parse_mfa_page(html: str) -> dict[str, Any]:
 
 
 def device_id(path: "Path | None" = None) -> str:
-    """本机这份荔园助手的设备 ID：随机生成一次后固定不变（相当于浏览器 localStorage 里的 browser_fingerprint）。
+    """本机这份爱小荔的设备 ID：随机生成一次后固定不变（相当于浏览器 localStorage 里的 browser_fingerprint）。
 
     学校的 common-header.js 在登录页 / 验证页加载时算一个浏览器指纹（UA、语言、canvas 的 MD5，32 位大写十六进制），
     再 GET /authserver/bfp/info?bfp=指纹 登记，服务器据此种 MULTIFACTOR_BROWSER_FINGERPRINT。
