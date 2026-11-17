@@ -1,7 +1,7 @@
 [project]
 name = "szu-agent"
 version = "0.1.0"
-description = "深大校园事务 Agent：LangGraph + MCP，封装 szu-cli 为工具"
+description = "爱小荔：深圳大学校园事务 Agent（LangGraph + MCP，自行实现统一认证与各系统接口）"
 requires-python = ">=3.12"
 dependencies = [
     "beautifulsoup4>=4.15.0",
