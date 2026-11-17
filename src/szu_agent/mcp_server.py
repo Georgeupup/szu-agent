@@ -674,6 +674,98 @@ def create_server(campus: Any = None) -> FastMCP:
             data["hint"] = "带 stale 的条目超过半年没核实，回答时提醒用户以申请页面为准。"
         return {"ok": True, "data": data}
 
+    # ------------------------------ 校园导航 / 小巴 ------------------------------ #
+
+    @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, openWorldHint=False))
+    async def campus_navigate(
+        destination: Annotated[str, Field(description="要去的地方：楼名、宿舍、食堂、校门、学院或用途，如“汇典楼”“图书馆”“经济学院”“红豆斋”“立德门”")],
+        origin: Annotated[str | None, Field(description="出发地，不填就只介绍目的地在哪。用户说“从宿舍出发”时用记忆里的宿舍楼名")] = None,
+        campus: Annotated[Literal["粤海", "丽湖"] | None, Field(description="校区。知道就传：两个校区有同名的地方（校医院、图书馆）")] = None,
+    ) -> dict[str, Any]:
+        """校园导航（粤海、丽湖）：某栋楼/宿舍/食堂/校门在哪（在哪栋楼的哪一侧、最近的校门和校园小巴站）；
+        从 A 到 B 走路多久、要不要坐校园小巴（在哪站上、往哪个方向坐几站、在哪站下）；跨校区时给通勤班车的上车点和最近几班。
+        用于“汇典楼在哪”“经济学院在哪栋楼”“从韵竹阁去汇研楼怎么走”“能坐小巴去吗”“去丽湖怎么坐班车”。
+        位置来自学校手绘地图，误差约 50 米：距离和时间都是估算，回答说“大约”，不要说成精确导航。"""
+        from .knowledge.campusmap import default_map
+
+        m = default_map()
+
+        def pick(q: str, role: str) -> tuple[Any, dict[str, Any] | None]:
+            p, cands = m.resolve(q, campus)
+            if p:
+                return p, None
+            if not cands:
+                return None, {"ok": True, "data": {role: q, "found": False,
+                              "hint": f"地图上没有“{q}”。可以换个叫法（正式楼名）再查一次；"
+                                      "还查不到就如实说地图上没有，不要凭印象说位置。"}}
+            return None, {"ok": True, "data": {role: q, "ambiguous": True,
+                          "candidates": [{"name": c.label, "campus": c.campus, "kind": c.kind} for c in cands],
+                          "hint": "有多个同名/相近的地方，问用户是哪一个（或哪个校区），再用准确的名字和 campus 重查。"}}
+
+        dest, err = pick(destination, "destination")
+        if err:
+            return err
+        data: dict[str, Any]
+        if origin:
+            src, err = pick(origin, "origin")
+            if err:
+                return err
+            data = m.route(src, dest)
+        else:
+            data = m.describe(dest)
+        if (data.get("to") or data).get("unsure") or (data.get("from") or {}).get("unsure"):
+            data["unsureHint"] = "带 unsure 的名字是从地图上看不清的字转录的，提醒用户以现场标识为准。"
+        data["source"] = "学校官方手绘校区地图（转录）+ 校园小巴线路数据；位置误差约 50 米"
+        if "shuttleNow" in data:
+            data["source"] += "；粤海小巴的站序和运营规则来自学生攻略（非官方），坐车建议要说明这一点"
+        return {"ok": True, "data": data}
+
+    @mcp.tool(annotations=READ_ONLY)
+    async def shuttle_status(
+        campus: Annotated[Literal["粤海", "丽湖"], Field(description="校区")],
+        stop: Annotated[str | None, Field(description="用户要上车的校园小巴站名（campus_navigate 返回的 board / shuttleStops 里的名字）。"
+                                                     "传了就按每辆车的方向估算还有几站、几分钟到")] = None,
+    ) -> dict[str, Any]:
+        """校园小巴实时情况：现在有几辆车在跑、各在哪个站附近、往哪个方向（环线，顺时针和逆时针两个方向都有车）；
+        传 stop 时估算各车到这个站还有几站、约几分钟。另附本校区出发的粤海↔丽湖通勤班车接下来几班。
+        粤海还附学生攻略（guide）：运营时间、票价和支付方式、内环/外环各方向站序、周末只有外环、乘车经验。
+        用于“小巴现在在哪”“下一班小巴多久到”“还有小巴吗”“小巴几点停/多少钱/怎么付”“内环外环有什么区别”“班车几点”。
+        到站时间是按距离估的，说“大约”；guide 是学生经验，引用时说明非官方。"""
+        from .campus.shuttle import get_vehicles, mock_vehicles
+        from .knowledge.campusmap import default_map
+
+        m = default_map()
+        loop = m.loops[campus]
+        if stop and not loop.stop(stop):
+            p, _ = m.resolve(stop, campus)
+            near = m.nearest_stops(p, 1)[0][0].name if p else None
+            if not near:
+                return {"ok": False, "error": {"code": "BAD_ARGUMENT", "message": f"{campus}校区小巴没有“{stop}”站",
+                                               "stops": [s.name for s in loop.stops]}}
+            stop = near  # 用户说的是楼名：换成离它最近的站
+        if os.environ.get("SZU_AGENT_MOCK") == "1":
+            vehicles: list[dict[str, Any]] | None = mock_vehicles(campus)
+            live_error = None
+        else:
+            res = await call(get_vehicles(campus))
+            vehicles, live_error = (res["data"], None) if res["ok"] else (None, res["error"])
+        if vehicles is None:
+            data: dict[str, Any] = {"campus": campus, "line": loop.name, "stops": [s.name for s in loop.stops],
+                                    "liveError": live_error,
+                                    "hint": "实时位置查不到：告诉用户现在看不到车在哪，只能按线路和站点回答。"}
+        else:
+            data = m.live(campus, vehicles, stop)
+            if not data["vehicles"]:
+                data["hint"] = "现在没有在线的小巴（可能已收车或还没发车），如实告诉用户；不要猜运营时间。"
+        if stop:
+            data["stop"] = stop
+        guide = m.guide_summary(campus)
+        if guide:
+            data["guide"] = guide
+        data["intercampus"] = m.next_departures(campus)
+        data["source"] = "荔园小巴（深大小巴公开接口）实时数据"
+        return {"ok": True, "data": data}
+
     # ------------------------------ 课表 / 图书馆 ------------------------------ #
 
     @mcp.tool(annotations=READ_ONLY)

@@ -19,7 +19,7 @@ const TOOL_LABELS = {
   weather_today: "查询天气", electricity_purchases: "查询充值记录", show_recharge_card: "电费充值",
   library_book: "查看馆藏位置", library_prebook_preview: "生成预借预览", library_prebook_confirm: "提交预借",
   library_my_prebooks: "查看我的预借", library_prebook_cancel_preview: "预览取消预借", library_prebook_cancel_confirm: "取消预借",
-  campus_guide: "查校园资料库", academic_calendar: "查校历", policy_search: "查评选细则", booth_list: "查看公共空间", booth_slots: "查询空间时段", booth_my_reservations: "查看空间预约",
+  campus_guide: "查校园资料库", campus_navigate: "查校园地图", shuttle_status: "查校园小巴", academic_calendar: "查校历", policy_search: "查评选细则", booth_list: "查看公共空间", booth_slots: "查询空间时段", booth_my_reservations: "查看空间预约",
   booth_reserve_preview: "生成空间预约预览", booth_reserve_confirm: "提交空间预约", booth_cancel_preview: "预览取消空间预约", booth_cancel_confirm: "取消空间预约",
 };
 const WEEK = "日一二三四五六";
