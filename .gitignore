@@ -13,3 +13,4 @@ resource/promo/*.mp3
 .claude/
 *.sqlite
 *.sqlite-*
+resource/xiaohongshu/
