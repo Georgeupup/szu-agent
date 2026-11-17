@@ -135,6 +135,9 @@ class CampusHttp:
             headers={"User-Agent": UA, "Accept-Language": "zh-CN,zh;q=0.9"},
             follow_redirects=True,
             timeout=httpx.Timeout(timeout, connect=20),
+            # 连接空闲保留 120 秒（httpx 默认 5 秒）：两次工具调用之间隔着模型思考，经常超过 5 秒；
+            # 服务器在境外时到学校一次往返约 0.2 秒，重新握手（TCP+TLS）要多花约 0.6 秒
+            limits=httpx.Limits(max_keepalive_connections=10, keepalive_expiry=120),
             transport=transport,
         )
         self._loaded_mtime = -1.0
