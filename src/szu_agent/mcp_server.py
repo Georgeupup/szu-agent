@@ -680,12 +680,26 @@ def create_server(campus: Any = None) -> FastMCP:
     async def course_today(
         date: Annotated[str | None, Field(description="YYYY-MM-DD，不填为今天")] = None,
     ) -> dict[str, Any]:
-        """查询某一天的课程（节次、地点、老师）。"""
+        """查询某一天的课程（节次、地点、老师）。研究生和本科生都可以用（研究生走研究生院课表系统）。
+        节次对应的上课时间用 academic_calendar(with_periods=true) 查。"""
         try:
             day = Date.fromisoformat(date) if date else None
         except ValueError:
             return {"ok": False, "error": {"code": "BAD_DATE", "message": "日期格式应为 YYYY-MM-DD"}}
         return await call(svc.course_today(day))
+
+    @mcp.tool(annotations=READ_ONLY)
+    async def course_schedule(
+        term: Annotated[str | None, Field(
+            description="学期，如“2025-2026-1”（学年-第几学期）或“2025-2026学年第一学期”；不填为学校默认显示的学期（通常是当前学期）")] = None,
+    ) -> dict[str, Any]:
+        """查询一整个学期的课表：每门课在星期几（weekday 1-7，7=周日）第几节、哪几周、教室、老师；unscheduled 是没排上课时间的课。
+        用于“这学期有哪些课”“工程伦理在哪上”“周三有什么课”“上学期的课表”。只支持研究生；某一天有什么课用 course_today。"""
+        res = await call(svc.course_schedule(term))
+        if res["ok"]:
+            res["data"]["items"] = [{k: v for k, v in x.items() if v not in (None, []) and k != "className"}
+                                    for x in res["data"]["items"]]
+        return res
 
     @mcp.tool(annotations=READ_ONLY)
     async def grades_query(

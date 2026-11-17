@@ -1211,3 +1211,97 @@ async def test_grades_non_json_is_page_changed(tmp_path):
     with pytest.raises(CampusError) as e:
         await svc.grades()
     assert e.value.code == "PAGE_CHANGED" and "研究生" in e.value.message
+
+
+# ------------------------------------------------------------------ 研究生课表（wdkbapp，参数来自学校公开前端脚本 xskcbBS.js）
+
+PERIOD_TIMES = {3: (1015, 1055), 4: (1100, 1140), 5: (1145, 1225), 7: (1415, 1455), 8: (1500, 1540), 9: (1600, 1640)}
+
+
+def gs_period_rows(course, weekday, weeks, periods, room="致理楼L3-306", teacher="王五"):
+    """学校一节一行，KSJCDM = JSJCDM（2026-11-17 自检实测），页面再把相同的格子合并。"""
+    return [{"KCMC": course, "BJMC": "01", "JSXM": teacher, "JASMC": room, "ZCMC": weeks, "XQ": str(weekday),
+             "KSJCDM": str(p), "JSJCDM": str(p), "KSSJ": PERIOD_TIMES[p][0], "JSSJ": PERIOD_TIMES[p][1],
+             "JCFADM": "02", "XH": "2099123456"} for p in periods]
+
+
+def test_active_in_week_real_formats():
+    from szu_agent.campus.parsers import active_in_week
+
+    text = "1,3-4,6-7,9,11-12周"  # “周”只写在最后
+    assert [w for w in range(1, 14) if active_in_week(text, w)] == [1, 3, 4, 6, 7, 9, 11, 12]
+    assert [w for w in range(1, 12) if active_in_week("2,5,8-10双周", w)] == [2, 5, 8, 10]  # 单双只管区间
+    assert [w for w in range(1, 8) if active_in_week("1-7周(单)", w)] == [1, 3, 5, 7]
+    assert active_in_week("16周", 16) and not active_in_week("16周", 6)
+
+
+GS_ROWS = (gs_period_rows("工程伦理", 1, "2-9周", [4, 5]) + gs_period_rows("算法设计与分析", 1, "2-17周", [7, 8, 9])
+           + gs_period_rows("机器学习", 1, "1-15周(单)", [3]) + gs_period_rows("复杂网络", 2, "2-17周", [3, 4, 5]))
+
+
+def gs_course_server(seen, *, student=True):
+    def handler(req):
+        name = req.url.path.rsplit("/", 1)[-1]
+        seen.append((req.method, name, req.url.query.decode() if req.method == "GET" else req.content.decode()))
+        if "/gsapp/sys/wdkbapp/" not in req.url.path:
+            return httpx.Response(404)
+        if name == "index.do":
+            return httpx.Response(200, text="<html>我的课表应用</html>")
+        if name == "initXsxx.do":
+            data = [{"XH": "2099123456", "XM": "张三", "YXDM_DISPLAY": "计算机与软件学院"}] if student else []
+            return httpx.Response(200, json={"data": data})
+        if name == "kfdxnxqcx.do":
+            return httpx.Response(200, json={"code": "0", "datas": {"kfdxnxqcx": {"rows": [
+                {"XNXQDM": "20261", "XNXQDM_DISPLAY": "2026-2027学年 第一学期"},
+                {"XNXQDM": "20252", "XNXQDM_DISPLAY": "2025-2026学年 第二学期"}]}}})
+        if name == "xspkjgcx.do":
+            term = parse_qs(req.content.decode())["XNXQDM"][0]
+            return httpx.Response(200, json={"code": "0", "datas": {"xspkjgcx": {"rows": GS_ROWS if term == "20261" else []}}})
+        if name == "xsjxrwcx.do":
+            return httpx.Response(200, json={"code": "0", "datas": {"xsjxrwcx": {"totalSize": 2, "rows": [
+                {"KCMC": "算法设计与分析", "PKSJDD": "2-17周 星期一[7-9节]致理楼L3-306"},
+                {"KCMC": "科研创新实践", "PKSJDD": None}]}}})
+        return httpx.Response(404)
+
+    return httpx.MockTransport(handler)
+
+
+async def test_gs_course_schedule_merges_periods(tmp_path):
+    seen = []
+    svc = RealCampus(CampusHttp(SessionStore(tmp_path / "s.json"), transport=gs_course_server(seen)))
+    data = await svc.course_schedule()
+    assert data["term"] == "2026-2027学年 第一学期"  # 不填学期 = 页面默认的第一项
+    assert ("POST", "xspkjgcx.do", "XNXQDM=20261&XH=") in seen  # 照页面原样：学生看自己的课表时 XH 是空串
+    assert ("GET", "initXsxx.do", "XH=") in seen
+    algo = next(x for x in data["items"] if x["courseName"] == "算法设计与分析")
+    assert (algo["weekday"], algo["startSection"], algo["endSection"]) == (1, 7, 9)  # 一节一行 → 并成一段
+    assert algo["teachers"] == ["王五"] and algo["location"] == "致理楼L3-306"
+    assert algo["time"] == "14:15-16:40"  # 第一节的上课时间 - 最后一节的下课时间
+    assert [x["courseName"] for x in data["items"]][:3] == ["机器学习", "工程伦理", "算法设计与分析"]  # 按星期、节次排
+    assert data["unscheduled"] == ["科研创新实践"]
+    assert "2099123456" not in json.dumps(data, ensure_ascii=False) and "张三" not in json.dumps(data, ensure_ascii=False)
+
+    other = await svc.course_schedule("2025-2026-2")
+    assert other["term"] == "2025-2026学年 第二学期" and other["items"] == []
+    assert "availableTerms" in (await svc.course_schedule("2019"))["hint"]
+
+
+async def test_gs_course_today_uses_calendar_week(tmp_path):
+    svc = RealCampus(CampusHttp(SessionStore(tmp_path / "s.json"), transport=gs_course_server([])))
+    monday = await svc.course_today(date(2026, 11, 16))  # 2026-2027-1 第 12 周（双周）星期一
+    assert monday["week"] == 12
+    assert [x["courseName"] for x in monday["items"]] == ["算法设计与分析"]  # 工程伦理 2-9 周已结课，机器学习只上单周
+    holiday = await svc.course_today(date(2026, 8, 1))
+    assert holiday["items"] == [] and "教学周" in holiday["note"]
+
+
+async def test_undergrad_falls_back_to_jwapp(tmp_path):
+    seen = []
+    svc = RealCampus(CampusHttp(SessionStore(tmp_path / "s.json"), transport=gs_course_server(seen, student=False)))
+    with pytest.raises(CampusError) as e:
+        await svc.course_schedule()
+    assert e.value.code == "NOT_SUPPORTED_YET"
+    with pytest.raises(CampusError) as e:
+        await svc.course_today(date(2026, 11, 16))  # 研究生院不认这个账号 → 走本科教务（这里没模拟，所以报 PAGE_CHANGED）
+    assert e.value.code == "PAGE_CHANGED" and any(s[1] == "dqxnxq.do" for s in seen)
+    assert sum(1 for s in seen if s[1] == "initXsxx.do") == 1  # 身份判断只做一次

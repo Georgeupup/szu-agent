@@ -276,11 +276,16 @@ def _rows(api: dict | None, key: str) -> list[dict[str, Any]]:
 def active_in_week(weeks_text: str | None, week: int | None) -> bool:
     if not week or not weeks_text:
         return True
-    for part in str(weeks_text).split(","):
-        if m := re.search(r"(\d+)\s*-\s*(\d+)周", part):
-            if int(m[1]) <= week <= int(m[2]):
-                return True
-        elif (m := re.search(r"(\d+)周", part)) and int(m[1]) == week:
+    # 真实写法（2026-11-17 研究生课表自检）：“1-16周”“16周”“1,3-4,6-7,9,11-12周”（“周”只在最后写一次）、
+    # “2,5,8-10双周”（单双只管它所在的那一段区间：第 5 周是单数，照样上）、“1-15周(单)”
+    for seg in re.split(r"[,，]", str(weeks_text)):
+        if m := re.search(r"(\d+)\s*-\s*(\d+)", seg):
+            if not int(m[1]) <= week <= int(m[2]):
+                continue
+            if ("单" in seg and week % 2 == 0) or ("双" in seg and week % 2 == 1):
+                continue
+            return True
+        if (m := re.search(r"\d+", seg)) and int(m[0]) == week:
             return True
     return False
 
@@ -600,7 +605,7 @@ def normalize_grade(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _term_key(text: str) -> str:
+def term_key(text: str) -> str:
     """用户写的学期 → 便于匹配的形式：去空格；“2025-2026-1”转成学校的学期代码“20251”。"""
     text = re.sub(r"\s+", "", text)
     if m := re.fullmatch(r"(\d{4})-\d{4}-([12])", text):
@@ -643,7 +648,7 @@ def build_grade_report(rows: list[dict[str, Any]], term: str | None = None) -> d
     if term == "latest":
         picked = order[:1]
     elif term:
-        want = _term_key(term)
+        want = term_key(term)
         picked = [k for k in order if want in k[0] or want in re.sub(r"\s+", "", k[1])]
 
     groups = []
@@ -656,3 +661,75 @@ def build_grade_report(rows: list[dict[str, Any]], term: str | None = None) -> d
     if term and not groups:
         report["hint"] = f"没有和“{term}”对应的学期，可选的学期见 availableTerms"
     return report
+
+
+# ------------------------------------------------------------------ 研究生课表（研究生院 wdkbapp）
+# 接口和字段来自学校公开的前端脚本（不登录也能读）：
+#   https://ehall.szu.edu.cn/gsapp/sys/wdkbapp/modules/xskcb/xskcb.js、xskcbBS.js
+#   kfdxnxqcx.do  开放查询的学期（第一项是页面默认学期）  rows: XNXQDM / XNXQDM_DISPLAY（另有 DM / MC）
+#   xspkjgcx.do   排课结果（课表格子）{XNXQDM, XH: ""}  rows: KCMC 课程 BJMC 班级 JSXM 教师 JASMC 教室
+#                 ZCMC 周次（“2-17周”） XQ 星期（1-7，7=周日） KSJCDM 开始节次 JCFADM 节次方案
+#   xsjxrwcx.do   本学期的课程列表（含没排课的课）{XNXQDM, XH: ""} + 分页  rows: KCMC PKSJDD（上课时间地点，没排课为空）
+# 学生看自己的课表时页面发的 XH 是空串（_reqXH 只在管理员带 ?reqXH= 打开时才有），学校按登录会话认人。
+
+def gs_term_code(calendar_term_id: str) -> str:
+    """校历的学期 id “2025-2026-1” → 研究生院系统的学期代码 “20251”。"""
+    return term_key(calendar_term_id)
+
+
+def emap_rows(body: Any, key: str, what: str) -> list[dict[str, Any]]:
+    """EMAP 接口的 datas.<key>.rows；结构不对报 PAGE_CHANGED，不返回半截数据。"""
+    from .errors import CampusError
+
+    data = (body.get("datas") or {}).get(key) if isinstance(body, dict) else None
+    if not isinstance(data, dict) or not isinstance(data.get("rows"), list):
+        raise CampusError("PAGE_CHANGED", f"{what}接口返回的结构和预期不一致（code={body.get('code') if isinstance(body, dict) else None}）")
+    return [r for r in data["rows"] if isinstance(r, dict)]
+
+
+def _hhmm(value: Any) -> str | None:
+    """KSSJ / JSSJ → “08:30”。学校前端的 formatSj 把 830 补成 0830 再插冒号；已经带冒号的原样用。"""
+    text = str(value or "").strip()
+    if re.fullmatch(r"\d{1,2}:\d{2}(:\d{2})?", text):
+        return text[:5].zfill(5)
+    if re.fullmatch(r"\d{3,4}", text):
+        text = text.zfill(4)
+        return f"{text[:2]}:{text[2:]}"
+    return None
+
+
+def build_gs_courses(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """xspkjgcx 的行 → 和本科课表一样的条目（courseName / teachers / weeksText / weekday / startSection / endSection / location）。
+
+    页面把每条记录放进“开始节次 × 星期”的格子，再把上下内容相同的格子合并（mergeTable.mergeTableByRow），
+    所以一节课可能是一节一行。这里按“同一门课、同一天、同样周次和教室”把连续的节次并成一段；
+    行里如果另有结束节次（JSJCDM）也照用。"""
+    groups: dict[tuple, set[int]] = {}
+    times: dict[tuple, dict[int, str | None]] = {}
+    for r in rows:
+        start = _num(r.get("KSJCDM"))
+        if start is None:
+            continue
+        end = _num(r.get("JSJCDM")) or start
+        key = (str(r.get("KCMC") or ""), str(r.get("BJMC") or ""), _num(r.get("XQ")), str(r.get("ZCMC") or ""),
+               str(r.get("JASMC") or ""), str(r.get("JSXM") or ""))
+        groups.setdefault(key, set()).update(range(int(start), int(end) + 1))
+        times.setdefault(key, {})[int(start)] = _hhmm(r.get("KSSJ"))
+        times[key].setdefault(-int(end), _hhmm(r.get("JSSJ")))  # 负数键 = 这一节的下课时间
+    items = []
+    for (course, klass, weekday, weeks, room, teachers), periods in groups.items():
+        ordered = sorted(periods)
+        run = [ordered[0]]
+        for p in ordered[1:] + [None]:
+            if p is not None and p == run[-1] + 1:
+                run.append(p)
+                continue
+            key = (course, klass, weekday, weeks, room, teachers)
+            begin, finish = times[key].get(run[0]), times[key].get(-run[-1])
+            items.append({"courseName": course or None, "className": klass or None,
+                          "teachers": [t.strip() for t in re.split(r"[,，、]", teachers) if t.strip()],
+                          "weeksText": weeks or None, "weekday": weekday, "startSection": run[0], "endSection": run[-1],
+                          "time": f"{begin}-{finish}" if begin and finish else None, "location": room or None})
+            if p is not None:
+                run = [p]
+    return sorted(items, key=lambda x: (x["weekday"] or 0, x["startSection"]))

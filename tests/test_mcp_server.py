@@ -103,6 +103,14 @@ async def test_electricity_and_course(logged_in):
         assert (await client("course_today", date="13/11"))["error"]["code"] == "BAD_DATE"
 
 
+async def test_course_schedule_tool(logged_in):
+    async with mcp_client(logged_in) as client:
+        data = (await client("course_schedule"))["data"]
+        assert data["items"] and all("className" not in x for x in data["items"])
+        assert data["unscheduled"] == ["科研创新实践"]
+        assert (await client("course_schedule", term="2019-2020-1"))["data"]["hint"]
+
+
 async def test_grades_query_trims_output(logged_in):
     async with mcp_client(logged_in) as client:
         res = await client("grades_query", term="latest")

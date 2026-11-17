@@ -131,6 +131,53 @@ async def check_library(ctrlno: str = "3351727", out=print) -> None:
         await http.aclose()
 
 
+async def check_courses(out=print) -> None:
+    """研究生课表（wdkbapp）：身份判断、开放学期、每个学期的排课记录长什么样、课程列表分页。
+
+    不输出课程名、老师、教室、学号姓名；只输出字段名、计数、周次 / 星期 / 节次这类取值。
+    """
+    from collections import Counter
+
+    from .campus.debuglog import where
+    from .campus.parsers import build_gs_courses, emap_rows
+    from .campus.service import GS_COURSE_PAGE
+
+    store = SessionStore()
+    out(f"登录凭证: {'有' if store.info()['hasSession'] else '没有'}")
+    http = CampusHttp(store, cache_ttl=0)
+    svc = RealCampus(http)
+    try:
+        resp = await http.request("GET", GS_COURSE_PAGE)
+        out(f"[index.do] {resp.status_code} 落在 {where(resp.url)}")
+        info = await svc._gs_json("GET", "wdkcb/initXsxx.do", "学生信息", params={"XH": ""})
+        data = info.get("data") if isinstance(info, dict) else None
+        out(f"[initXsxx.do] 顶层 {sorted(info) if isinstance(info, dict) else type(info).__name__}，"
+            f"data {len(data) if isinstance(data, list) else data!r} 条，字段 {_keys(data) if isinstance(data, list) else '-'}")
+        out(f"  判断为研究生: {await svc._is_graduate()}")
+        terms = await svc._gs_terms()
+        out(f"[kfdxnxqcx.do] 开放学期: {terms}")
+        for code, name in terms[:3]:
+            body = await svc._gs_json("POST", "modules/xskcb/xspkjgcx.do", "课表", data={"XNXQDM": code, "XH": ""})
+            rows = emap_rows(body, "xspkjgcx", "研究生课表")
+            items = build_gs_courses(rows)
+            out(f"\n[xspkjgcx.do {name}] {len(rows)} 条记录 → 合并成 {len(items)} 段，字段 {_keys(rows)}")
+            for k in ("ZCMC", "XQ", "KSJCDM", "JSJCDM", "KSSJ", "JSSJ"):
+                out(f"  {k} 取值: {dict(Counter(str(r.get(k)) for r in rows).most_common(10))}")
+            out("  合并后: " + "; ".join(f"周{x['weekday']} 第{x['startSection']}-{x['endSection']}节 {x['time']} {x['weeksText']}" for x in items))
+            lst = await svc._gs_json("POST", "modules/xskcb/xsjxrwcx.do", "课程列表",
+                                     data={"XNXQDM": code, "XH": "", "pageSize": "100", "pageNumber": "1"})
+            lrows = emap_rows(lst, "xsjxrwcx", "研究生课程列表")
+            total = ((lst.get("datas") or {}).get("xsjxrwcx") or {}).get("totalSize")
+            out(f"[xsjxrwcx.do {name}] totalSize={total}，本页 {len(lrows)} 行，没排课的 {sum(1 for r in lrows if not r.get('PKSJDD'))} 门")
+        out("\n自检完成（只读；上面没有课程名、老师、教室）")
+    except CampusError as exc:
+        out(f"\n✗ {exc.code}: {exc.message}")
+        if exc.code in ("LOGIN_REQUIRED", "MFA_REQUIRED"):
+            out("  先在爱小荔界面上登录 / 完成二次验证，再运行一次")
+    finally:
+        await http.aclose()
+
+
 async def check_grades(out=print) -> None:
     """研究生成绩（szdxwdcjapp）：进应用落在哪、两种请求体的返回、行里有哪些字段、各字段有值的条数。
 

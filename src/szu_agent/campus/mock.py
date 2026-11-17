@@ -21,7 +21,7 @@ import httpx
 from .cas import QrState
 from .errors import CampusError
 from .parsers import (
-    build_courses, build_grade_report, courses_on, parse_grade_page, lecture_progress, normalize_lecture, notice_stats,
+    build_courses, build_grade_report, courses_on, gs_term_code, parse_grade_page, term_key, lecture_progress, normalize_lecture, notice_stats,
     parse_library_book, parse_library_search, parse_notice_detail, parse_notice_list, parse_prebook_form,
 )
 from .contact import ContactStore
@@ -325,6 +325,17 @@ class MockCampus:
     async def course_today(self, day: date | None = None) -> dict[str, Any]:
         self._require_login()
         return courses_on(build_courses(json.loads(_read("course-api.json"))), day or date.today())
+
+    async def course_schedule(self, term: str | None = None) -> dict[str, Any]:
+        """演示：整学期课表，和 course_today 用同一份样例。"""
+        self._require_login()
+        data = build_courses(json.loads(_read("course-api.json")))
+        name = data["term"]["name"]
+        if term and term_key(term) not in term_key(name) and term_key(term) not in gs_term_code(data["term"]["id"] or ""):
+            return {"term": None, "items": [], "availableTerms": [name], "hint": f"没有和“{term}”对应的学期，可选的学期见 availableTerms"}
+        return {"term": name, "items": sorted(data["items"], key=lambda x: (x["weekday"] or 0, x["startSection"] or 0)),
+                "unscheduled": ["科研创新实践"], "availableTerms": [name],
+                "url": "https://ehall.szu.edu.cn/gsapp/sys/wdkbapp/*default/index.do"}
 
     async def grades(self, term: str | None = None) -> dict[str, Any]:
         """演示：研一两个学期的成绩（假数据，字段和真实接口一致）。"""

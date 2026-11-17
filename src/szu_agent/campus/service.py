@@ -20,7 +20,8 @@ from .contact import ContactStore
 from .errors import CampusError
 from .http import CampusHttp, decode, is_login_page, select_options
 from .parsers import (
-    BOARD_URL, OPAC_URL, build_courses, build_grade_report, parse_grade_page, notice_stats, courses_on, lecture_progress, normalize_lecture,
+    BOARD_URL, OPAC_URL, active_in_week, build_courses, build_grade_report, build_gs_courses, emap_rows, gs_term_code,
+    parse_grade_page, term_key, notice_stats, courses_on, lecture_progress, normalize_lecture,
     MODE_CODES, MODE_NAMES, normalize_booking, normalize_field, normalize_slot, parse_sports_catalog, parse_library_book, parse_library_search, parse_sims_page, parse_sims_room_id, reference_price, parse_notice_detail, parse_notice_list,
 )
 
@@ -34,6 +35,8 @@ SELF_MONEY = f"{SPORTS_APP}/modules/myBooking/getSelfMoney.do"
 CANCEL_BOOKING = f"{SPORTS_APP}/sportVenue/cancelSelectBookingInfo.do"
 PAY_DEADLINE_MINUTES = 45  # 学校脚本注释：个人包场、个人散场预约后 45 分钟内未支付，系统将自动取消
 COURSE_APP = f"{EHALL}/jwapp/sys/wdkb"
+GS_COURSE_APP = f"{EHALL}/gsapp/sys/wdkbapp"  # 研究生院“我的课表”
+GS_COURSE_PAGE = f"{GS_COURSE_APP}/*default/index.do"
 GRADE_APP = f"{EHALL}/gsapp/sys/szdxwdcjapp"  # 研究生院“我的成绩”
 GRADE_PAGE = f"{GRADE_APP}/*default/index.do"
 GRADE_LIST = f"{GRADE_APP}/modules/wdcj/xscjcx.do"
@@ -87,6 +90,7 @@ class RealCampus:
         self.http = http
         self.contact = contact or ContactStore()
         self._user_cache: tuple[str, str] | None = None
+        self._graduate: bool | None = None  # 研究生院课表系统认不认这个账号（每个用户一个 RealCampus，见 pool.py）
 
     # ------------------------------------------------------------ 登录状态
 
@@ -295,6 +299,8 @@ class RealCampus:
 
     async def course_today(self, day: date | None = None) -> dict[str, Any]:
         day = day or date.today()
+        if await self._is_graduate():
+            return await self._gs_course_day(day)
         await self.http.request("GET", f"{COURSE_APP}/*default/index.do", cache=True)
         api: dict[str, Any] = {}
         try:
@@ -307,6 +313,83 @@ class RealCampus:
         except (ValueError, KeyError, TypeError) as exc:
             raise CampusError("PAGE_CHANGED", "课表接口和预期不一致（该接口尚未用真实账号验证，需要抓包确认）") from exc
         return courses_on(build_courses(api), day)
+
+    # ------------------------------------------------------------ 研究生课表（学校公开前端脚本 xskcb.js / xskcbBS.js）
+
+    async def _gs_json(self, method: str, path: str, what: str, **kw: Any) -> Any:
+        resp = await self.http.request(method, f"{GS_COURSE_APP}/{path}", cache=True,
+                                       headers={"X-Requested-With": "XMLHttpRequest", "Referer": GS_COURSE_PAGE}, **kw)
+        try:
+            return resp.json()
+        except ValueError as exc:
+            raise CampusError("PAGE_CHANGED", f"研究生课表的{what}接口没有返回 JSON", url=GS_COURSE_PAGE) from exc
+
+    async def _is_graduate(self) -> bool:
+        """页面自己的判断：initXsxx.do 返回了学生信息就是研究生院的学生，否则页面提示“您不是学生，无法查询课表”。
+        返回的学号姓名只看有没有，不保存。本科生账号进不了 / 不是 JSON 也算“不是”，课表走本科教务系统。"""
+        if self._graduate is None:
+            try:
+                await self.http.request("GET", GS_COURSE_PAGE, cache=True)
+                body = await self._gs_json("GET", "wdkcb/initXsxx.do", "学生信息", params={"XH": ""})
+                self._graduate = bool(isinstance(body, dict) and isinstance(body.get("data"), list) and body["data"])
+            except CampusError as exc:
+                if exc.code not in ("PERMISSION_DENIED", "PAGE_CHANGED"):
+                    raise  # 没登录、要二次验证、网络问题：照常报给用户，不要误判成本科生
+                self._graduate = False
+        return self._graduate
+
+    async def _gs_terms(self) -> list[tuple[str, str]]:
+        """[(学期代码, 学期名)]，第一项是页面默认显示的学期。"""
+        rows = emap_rows(await self._gs_json("POST", "modules/xskcb/kfdxnxqcx.do", "学期"), "kfdxnxqcx", "研究生课表学期")
+        terms = [(str(r.get("XNXQDM") or r.get("DM") or ""), str(r.get("XNXQDM_DISPLAY") or r.get("MC") or "")) for r in rows]
+        return [t for t in terms if t[0]]
+
+    async def _gs_term_items(self, code: str) -> list[dict[str, Any]]:
+        body = await self._gs_json("POST", "modules/xskcb/xspkjgcx.do", "课表", data={"XNXQDM": code, "XH": ""})
+        return build_gs_courses(emap_rows(body, "xspkjgcx", "研究生课表"))
+
+    async def _gs_course_day(self, day: date) -> dict[str, Any]:
+        from ..knowledge.calendar import default_calendar
+
+        cal_term = default_calendar().term_containing(day)
+        week = cal_term.week_of(day) if cal_term else None
+        out: dict[str, Any] = {"term": cal_term.name if cal_term else None, "date": day.isoformat(), "week": week, "items": []}
+        if week is None:
+            out["note"] = "这天不在教学周内（假期、报到或考试周），没有排课"
+            return out
+        code = gs_term_code(cal_term.id)
+        if code not in {c for c, _ in await self._gs_terms()}:
+            out["note"] = "学校还没开放这个学期的研究生课表"
+            return out
+        out["items"] = [x for x in await self._gs_term_items(code)
+                        if x["weekday"] == day.isoweekday() and active_in_week(x["weeksText"], week)]
+        return out
+
+    async def course_schedule(self, term: str | None = None) -> dict[str, Any]:
+        """一整个学期的课表（研究生）。term 不填 = 学校页面默认的学期；也可以写“2025-2026-1”“20251”或学期名。"""
+        if not await self._is_graduate():
+            raise CampusError("NOT_SUPPORTED_YET", "目前只接入了研究生课表；本科生可以问某一天的课（course_today）",
+                              url=f"{COURSE_APP}/*default/index.do")
+        terms = await self._gs_terms()
+        if not terms:
+            raise CampusError("NOT_FOUND", "学校当前没有开放课表查询（页面提示“当前未开放课表查询”）", url=GS_COURSE_PAGE)
+        picked = terms[0]
+        if term:
+            want = term_key(term)
+            matches = [t for t in terms if want in t[0] or want in re.sub(r"\s+", "", t[1])]
+            if not matches:
+                return {"term": None, "items": [], "availableTerms": [n for _, n in terms],
+                        "hint": f"没有和“{term}”对应的学期，可选的学期见 availableTerms", "url": GS_COURSE_PAGE}
+            picked = matches[0]
+        items = await self._gs_term_items(picked[0])
+        # 课程列表（含没排上课表的课，如科研实践）：PKSJDD 为空的就是没排课的
+        body = await self._gs_json("POST", "modules/xskcb/xsjxrwcx.do", "课程列表",
+                                   data={"XNXQDM": picked[0], "XH": "", "pageSize": "100", "pageNumber": "1"})
+        scheduled = {x["courseName"] for x in items}
+        unscheduled = sorted({str(r.get("KCMC")) for r in emap_rows(body, "xsjxrwcx", "研究生课程列表")
+                              if r.get("KCMC") and not r.get("PKSJDD") and r.get("KCMC") not in scheduled})
+        return {"term": picked[1], "items": items, "unscheduled": unscheduled,
+                "availableTerms": [n for _, n in terms], "url": GS_COURSE_PAGE}
 
     # ------------------------------------------------------------ 研究生成绩（2026-11-17 抓包 + 真实账号自检）
 
