@@ -5,6 +5,8 @@
 #         .env 单独 scp 到 /tmp/szu-agent.env（只有第一次需要）
 #   服务器：bash setup-server.sh <服务器公网IP> [域名]
 #           域名只需第一次给（记在 /etc/nginx/ssl/szu-domain），之后更新代码照常 bash setup-server.sh <IP>
+#   访问学校经国内服务器转发（先在国内服务器上运行 setup-campus-proxy.sh）：
+#           CAMPUS_PROXY=http://国内IP:18888 bash setup-server.sh <IP>   （只需一次；CAMPUS_PROXY=off 关掉）
 #
 # 做的事：建 szu 账号 → 装 nginx、uv → 解压代码 → uv sync → systemd 两个服务（真实服务多人模式、演示站）
 #        → 服务器密钥（已有就不动！换了所有人的 user_id 都会变）→ 证书 → nginx → 启动并自检
@@ -111,6 +113,13 @@ fi
 if [ -n "$DOMAIN" ] && [ -f "$LE/fullchain.pem" ]; then HAVE_CERT=1; REAL_URL="${REAL_URL:-https://$DOMAIN}"
 else HAVE_CERT=""; REAL_URL="${REAL_URL:-https://$IP}"; fi
 
+# 访问学校经国内服务器转发（只给真实服务；演示站不访问学校）。设置一次后保留，CAMPUS_PROXY=off 删除
+if [ "${CAMPUS_PROXY:-}" = off ]; then
+  rm -f "$D/campus-proxy.conf"
+elif [ -n "${CAMPUS_PROXY:-}" ]; then
+  printf '[Service]\nEnvironment=SZU_AGENT_CAMPUS_PROXY=%s\n' "$CAMPUS_PROXY" > "$D/campus-proxy.conf"
+fi
+
 # 演示站上显示“去真实服务”的链接
 mkdir -p /etc/systemd/system/szu-agent-demo.service.d
 printf '[Service]\nEnvironment=SZU_AGENT_REAL_URL=%s\n' "$REAL_URL" > /etc/systemd/system/szu-agent-demo.service.d/real-url.conf
@@ -124,6 +133,11 @@ echo "== 自检"
 systemctl is-active szu-agent szu-agent-demo nginx | paste -sd' '
 echo "真实服务（应为 multiuser:true）：$(curl -sk https://127.0.0.1/api/meta)"
 echo "演示站（应为 mock:true）：      $(curl -s http://127.0.0.1/api/meta)"
+if [ -f "$D/campus-proxy.conf" ]; then
+  P="$(sed -n 's/^Environment=SZU_AGENT_CAMPUS_PROXY=//p' "$D/campus-proxy.conf")"
+  echo "学校 直连：        $(curl -s -o /dev/null -w '首字节 %{time_starttransfer}s' https://ehall.szu.edu.cn/ || echo 失败)"
+  echo "学校 经 $P：$(curl -s -o /dev/null -x "$P" -w '首字节 %{time_starttransfer}s' https://ehall.szu.edu.cn/ || echo 失败（会自动直连，检查转发服务器和安全组）)"
+fi
 if [ -n "$HAVE_CERT" ]; then
   echo "正式证书（不加 -k 也应成功）：  $(curl -s --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/api/meta" || echo 失败)"
   echo "证书到期：$(openssl x509 -enddate -noout -in "$LE/fullchain.pem")（certbot.timer 自动续期：$(systemctl is-active certbot.timer)）"

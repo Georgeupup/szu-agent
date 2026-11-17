@@ -22,10 +22,12 @@ from bs4 import BeautifulSoup
 
 from .debuglog import log, where
 from .errors import CampusError
+from .route import campus_transport
 from .session import SessionStore
 
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36"
 INTRANET_NOTICE = "仅限内网访问"
+CAMPUS_LIMITS = httpx.Limits(max_keepalive_connections=10, keepalive_expiry=120)
 
 
 INTRANET_HOSTS = {"lecture.szu.edu.cn"}
@@ -137,8 +139,8 @@ class CampusHttp:
             timeout=httpx.Timeout(timeout, connect=20),
             # 连接空闲保留 120 秒（httpx 默认 5 秒）：两次工具调用之间隔着模型思考，经常超过 5 秒；
             # 服务器在境外时到学校一次往返约 0.2 秒，重新握手（TCP+TLS）要多花约 0.6 秒
-            limits=httpx.Limits(max_keepalive_connections=10, keepalive_expiry=120),
-            transport=transport,
+            limits=CAMPUS_LIMITS,
+            transport=campus_transport(transport, CAMPUS_LIMITS),
         )
         self._loaded_mtime = -1.0
         self._sem = asyncio.Semaphore(2)

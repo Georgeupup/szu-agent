@@ -34,6 +34,7 @@ from .cas import AUTH, BROWSER_LIKE_LIMITS, encrypt_password
 from .debuglog import log, where
 from .errors import CampusError
 from .http import UA, decode
+from .route import campus_transport
 from .session import SessionStore
 
 CODE_TYPE_NAMES = {"3": "reAuthDynamicCodeType", "4": "reAuthWChatDynamicCodeType"}
@@ -105,7 +106,7 @@ class MfaClient:
         self.store = store
         self.client = httpx.AsyncClient(headers={"User-Agent": UA}, follow_redirects=True,
                                         timeout=httpx.Timeout(30, connect=20), limits=BROWSER_LIKE_LIMITS,
-                                        transport=transport)
+                                        transport=campus_transport(transport, BROWSER_LIKE_LIMITS))
         self.client.cookies = store.cookies()
         self.page: dict[str, Any] | None = None
         self.auth = AUTH  # 验证页所在的认证服务器，start() 里按实际落地的主机改

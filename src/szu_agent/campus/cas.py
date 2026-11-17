@@ -30,6 +30,7 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 from .errors import CampusError
 from .http import UA, decode, is_login_page
+from .route import campus_transport
 from .session import SessionStore
 
 AUTH = "https://authserver.szu.edu.cn/authserver"
@@ -107,7 +108,8 @@ class CasClient:
         self.auth = WEBVPN_AUTH if realm == "webvpn" else AUTH
         self.client = httpx.AsyncClient(headers={"User-Agent": UA}, follow_redirects=True,
                                         timeout=httpx.Timeout(60 if realm == "webvpn" else 30, connect=20),
-                                        limits=BROWSER_LIKE_LIMITS, transport=transport)
+                                        limits=BROWSER_LIKE_LIMITS,
+                                        transport=campus_transport(transport, BROWSER_LIKE_LIMITS))
         if realm == "webvpn":
             # 保留主登录等其他 Cookie（保存时整份写回），只丢掉旧的 WebVPN Cookie，从干净的 WebVPN 状态开始
             for c in store.cookies().jar:
