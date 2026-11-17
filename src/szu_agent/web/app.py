@@ -7,6 +7,8 @@
     GET  /api/threads   /  DELETE /api/threads/{id}    历史会话列表（SQLite 持久化，重启不丢）
     GET  /api/today                                    今日课表 + 宿舍电量
     GET  /api/weather?campus=                          校区天气（左侧“今日荔园”和背景动画用）
+    GET  /api/shuttle/map?campus=                      小巴地图卡片：环线、站点、校门（静态几何）
+    GET  /api/shuttle/live?campus=                     小巴地图卡片：实时车辆位置（卡片每 10 秒拉一次）
     GET  /api/profile  /  DELETE /api/profile/{key}    长期记忆
     GET / PUT / DELETE /api/contact     图书馆预借用的手机号（只走这里，不进 LLM；GET 只返回打码后的）
     GET  /api/meta                                     演示模式等信息
@@ -30,6 +32,7 @@ SSE 事件（data 为 JSON，按 type 区分）：
     token       模型输出的文字片段（流式）
     tool_start  开始调用工具 {id, name, args}
     tool_end    工具返回     {id, name, ok, code?}   code=LOGIN_REQUIRED 时前端弹出登录卡片
+                             shuttleMap?             查小巴 / 导航建议坐小巴时，前端画小巴地图卡片
     message     一条完整的助手回复（用于校正流式拼接）
     confirm     图在 human_review 处暂停，等待用户确认 {actions}
     error       出错
@@ -161,6 +164,24 @@ def _booking_from_reserve(msg: ToolMessage) -> dict[str, Any] | None:
             "field": data.get("field"), "date": data.get("date"), "slot": (data.get("selected") or {}).get("label")}
 
 
+def _shuttle_map_from(msg: ToolMessage) -> dict[str, Any] | None:
+    """查小巴（shuttle_status）或导航建议坐小巴（campus_navigate）时，前端画地图卡片要的焦点信息。
+    只有校区、站名、方向这些公开信息；车辆位置卡片自己去 /api/shuttle/live 拉。"""
+    if msg.name not in ("shuttle_status", "campus_navigate"):
+        return None
+    try:
+        data = json.loads(message_text(msg)).get("data") or {}
+    except (json.JSONDecodeError, AttributeError):
+        return None
+    if msg.name == "shuttle_status":
+        return {"campus": data["campus"], "stop": data.get("stop")} if data.get("campus") else None
+    plan = data.get("shuttle")
+    if not plan or not str(data.get("advice", "")).startswith("可以坐小巴"):
+        return None  # 建议走路时不画，免得看起来像在推荐坐车
+    return {"campus": (data.get("from") or {}).get("campus"), "board": plan.get("board"), "alight": plan.get("alight"),
+            "via": plan.get("via") or [], "line": plan.get("line") or plan.get("direction")}
+
+
 async def graph_events(graph, inputs: Any, config: dict) -> AsyncIterator[dict[str, Any]]:
     """把 LangGraph 的两种流合并成前端事件：
     messages 模式给出逐字 token；updates 模式给出每个节点完成后的完整消息和中断。"""
@@ -193,6 +214,8 @@ async def graph_events(graph, inputs: Any, config: dict) -> AsyncIterator[dict[s
                             event["target"] = err.get("target")
                         if ok and msg.name == "sports_reserve_confirm" and (booking := _booking_from_reserve(msg)):
                             event["booking"] = booking  # 前端据此弹出付款卡片
+                        if ok and (sm := _shuttle_map_from(msg)):
+                            event["shuttleMap"] = sm
                         yield (event)
     except Exception as exc:  # 不让一次 LLM/网络错误把连接直接断掉，前端需要知道发生了什么
         yield {"type": "error", "message": f"{type(exc).__name__}: {exc}"}
@@ -485,6 +508,8 @@ def create_app(*, mock: bool | None = None, llm: BaseChatModel | None = None, pr
                         item["ok"] = _tool_ok(msg)
                         if item["ok"] and msg.name == "sports_reserve_confirm" and (booking := _booking_from_reserve(msg)):
                             item["booking"] = booking
+                        if item["ok"] and (sm := _shuttle_map_from(msg)):
+                            item["shuttleMap"] = sm
         pending = state.interrupts[0].value if state.interrupts else None
         if pending and _stale(state.created_at):
             # 确认令牌只在 MCP Server 内存里存 10 分钟（重启就没了）。过期的确认卡片不再显示，
@@ -858,6 +883,29 @@ def create_app(*, mock: bool | None = None, llm: BaseChatModel | None = None, pr
             return {"ok": True, **await get_weather(name)}
         except CampusError as exc:
             return {"ok": False, "error": exc.to_dict()}
+
+    @app.get("/api/shuttle/map")
+    async def shuttle_map(campus: str):
+        """小巴地图卡片的静态几何。公开数据，不需要登录（和天气一样）。"""
+        from ..knowledge.campusmap import default_map
+
+        if campus not in ("粤海", "丽湖"):
+            raise HTTPException(400, "campus 只能是 粤海 或 丽湖")
+        return {"ok": True, **default_map().map_view(campus)}
+
+    @app.get("/api/shuttle/live")
+    async def shuttle_live(campus: str):
+        """小巴实时位置。公开数据；上游有 10 秒缓存，所以不管多少人开着卡片，每个校区每 10 秒最多请求一次上游。"""
+        from ..campus.shuttle import get_vehicles, mock_vehicles
+        from ..knowledge.campusmap import default_map
+
+        if campus not in ("粤海", "丽湖"):
+            raise HTTPException(400, "campus 只能是 粤海 或 丽湖")
+        try:
+            vehicles = mock_vehicles(campus) if mock else await get_vehicles(campus)
+        except CampusError as exc:
+            return {"ok": False, "error": exc.to_dict()}
+        return {"ok": True, "vehicles": default_map().vehicle_points(campus, vehicles)}
 
     @app.get("/api/contact")
     async def get_contact(user: str = Depends(current_user)):

@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import math
 import os
 import time
 from datetime import datetime, timezone
@@ -57,8 +58,9 @@ def parse_vehicles(payload: dict[str, Any], now: datetime | None = None) -> list
             continue
         direction = ((v.get("stableDirection") or {}).get("direction")
                      or (v.get("directionAssignment") or {}).get("direction"))
+        heading = v.get("heading") if v.get("headingKnown") and isinstance(v.get("heading"), (int, float)) else None
         out.append({"name": v.get("name") or "小巴", "lat": float(pos["lat"]), "lng": float(pos["lng"]),
-                    "speedKmh": float(v.get("speed") or 0), "ageSeconds": age,
+                    "speedKmh": float(v.get("speed") or 0), "ageSeconds": age, "heading": heading,
                     "direction": direction if direction in ("clockwise", "counterclockwise") else None})
     return out
 
@@ -78,16 +80,27 @@ async def get_vehicles(campus: str, *, transport: httpx.AsyncBaseTransport | Non
     return data
 
 
-def mock_vehicles(campus: str) -> list[dict[str, Any]]:
-    """演示数据：每个校区两辆车，一个方向一辆，停在两个站旁边。"""
-    from ..knowledge.campusmap import default_map
+def mock_vehicles(campus: str, now: float | None = None) -> list[dict[str, Any]]:
+    """演示数据：三辆车沿真实线路折线匀速行驶（两辆顺着站点顺序、一辆反向），位置随时间变化，
+    这样演示模式里地图卡片每 10 秒刷新也能看到车在动。"""
+    from ..knowledge.campusmap import BUS_M_PER_MIN, default_map
 
-    loop = default_map().loops[campus]
-    frame = default_map().frames[campus]
-    picks = [(loop.stops[1], "clockwise", 18.0), (loop.stops[len(loop.stops) // 2], "counterclockwise", 0.0)]
+    m = default_map()
+    loop, frame = m.loops[campus], m.frames[campus]
+    t = time.time() if now is None else now
+    reverse = {"clockwise": "counterclockwise", "counterclockwise": "clockwise"}[loop.order]
     out = []
-    for i, (s, d, v) in enumerate(picks, 1):
-        lat = frame.lat0 + s.n / 110540.0
-        lng = frame.lng0 + s.e / frame.k
-        out.append({"name": f"{i}号车", "lat": lat, "lng": lng, "speedKmh": v, "ageSeconds": 6, "direction": d})
+    for i, (offset, direction) in enumerate([(0.1, loop.order), (0.55, loop.order), (0.3, reverse)], 1):
+        travelled = (t * BUS_M_PER_MIN / 60) % loop.length
+        s = (offset * loop.length + (travelled if direction == loop.order else -travelled)) % loop.length
+        k = max(j for j, c in enumerate(loop.cum) if c <= s) if s > 0 else 0
+        k = min(k, len(loop.line) - 2)
+        (ax, ay), (bx, by) = loop.line[k], loop.line[k + 1]
+        seg = (loop.cum[k + 1] - loop.cum[k]) or 1.0
+        f = (s - loop.cum[k]) / seg
+        e, n = ax + f * (bx - ax), ay + f * (by - ay)
+        dx, dy = (bx - ax, by - ay) if direction == loop.order else (ax - bx, ay - by)
+        heading = (math.degrees(math.atan2(dx, dy)) + 360) % 360
+        out.append({"name": f"{i}号车", "lat": frame.lat0 + n / 110540.0, "lng": frame.lng0 + e / frame.k,
+                    "speedKmh": 15.0, "ageSeconds": 4, "heading": round(heading), "direction": direction})
     return out

@@ -630,6 +630,46 @@ class CampusMap:
                 "source": f"{g['source']['title']}——学生经验，非官方，以车上和学校通知为准"}
 
 
+    # ------------------------------ 界面上的小巴地图 ------------------------------ #
+
+    def map_view(self, campus: str) -> dict[str, Any]:
+        """画小巴地图卡片用的几何数据（东/北米数，取整）。只有线路、站点和校门，不含任何个人信息。"""
+        loop = self.loops[campus]
+        stops: list[dict[str, Any]] = [{"name": s.name, "e": round(s.e), "n": round(s.n)} for s in loop.stops]
+        for ln in self.lines.get(campus, []):  # 粤海：攻略里的站（听荔餐厅、乔相阁…）也画上，并标出哪个方向停
+            for name, pos in ln.stops:
+                if not pos:
+                    continue
+                # 攻略叫法不同但就是接口里那个站（四海楼 = 留学生楼）：并成一个点，名字记进 aka
+                st = next((x for x in stops if x["name"] == name or name in x.get("aka", [])
+                           or math.hypot(x["e"] - pos[0], x["n"] - pos[1]) < 5), None)
+                if st is None:
+                    st = {"name": name, "e": round(pos[0]), "n": round(pos[1])}
+                    stops.append(st)
+                elif st["name"] != name and name not in st.setdefault("aka", []):
+                    st["aka"].append(name)
+                served = st.setdefault("servedBy", [])
+                if ln.name not in served:
+                    served.append(ln.name)
+        gates = [{"name": p.name, "e": round(p.e), "n": round(p.n)} for p in self.places
+                 if p.campus == campus and p.kind in ("校门", "地铁站") and not any(p.name == x["name"] for x in stops)]
+        return {"campus": campus, "line": [[round(e), round(n)] for e, n in loop.line],
+                "order": DIR_CN[loop.order], "stops": stops, "landmarks": gates,
+                "directions": {DIR_CN[geo]: n for n, geo in (self.guides.get(campus) or {}).get("directions", {}).items()}}
+
+    def vehicle_points(self, campus: str, vehicles: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """实时车辆换算到地图坐标；离线路太远的（停车场、维修）不画。"""
+        loop, frame = self.loops[campus], self.frames[campus]
+        out = []
+        for v in vehicles:
+            e, n = frame.en(v["lat"], v["lng"])
+            if loop.project(e, n)[1] > 150:
+                continue
+            out.append({"name": v["name"], "e": round(e), "n": round(n), "direction": DIR_CN.get(v.get("direction") or ""),
+                        "heading": v.get("heading"), "moving": v["speedKmh"] >= 3, "ageSeconds": v["ageSeconds"]})
+        return out
+
+
 _default: CampusMap | None = None
 
 

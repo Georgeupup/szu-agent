@@ -117,6 +117,8 @@ function argSummary(name, a = {}) {
   if (name === "notice_read_many") return `${(a.notice_ids || []).length} 篇`;
   if (name === "show_notice_board") return a.topic || "";
   if (name === "weather_today") return a.campus || "";
+  if (name === "campus_navigate") return [a.origin, a.destination].filter(Boolean).join(" → ");
+  if (name === "shuttle_status") return [a.campus, a.stop].filter(Boolean).join(" · ");
   if (name === "booth_slots") return a.date || "";
   return a.query || a.keyword || a.project || a.campus || a.date || "";
 }
@@ -346,6 +348,156 @@ async function addRechargeCard(a) {
   scrollDown();
 }
 
+// ---------------- 校园小巴地图卡片 ----------------
+// 查小巴 / 导航建议坐小巴时自动出现：环线、站点、上下车站和乘车路段、实时车辆（每 10 秒刷新，5 分钟后暂停）。
+// 坐标是后端换算好的“东/北米数”，这里只负责画；车辆位置从 /api/shuttle/live 拉，不经过模型。
+const shuttleGeo = {};
+let shuttleActive = null;  // 只有最新的一张卡片在刷新
+const SVGNS = "http://www.w3.org/2000/svg";
+function svgEl(tag, attrs = {}, text) {
+  const n = document.createElementNS(SVGNS, tag);
+  for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+  if (text != null) n.textContent = text;
+  return n;
+}
+
+async function addShuttleCard(info, live) {
+  if (!info?.campus) return;
+  showChatStarted();
+  const card = el("div", "shuttlecard");
+  const sub = info.board
+    ? `<b class="sc-on">${esc(info.board)}</b> 上车 → <b class="sc-off">${esc(info.alight)}</b> 下车${info.line ? ` · ${esc(info.line)}` : ""}`
+    : info.stop ? `你的站：<b class="sc-on">${esc(info.stop)}</b>` : "全部站点";
+  card.innerHTML = `<div class="confirm-head"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="3.5" width="16" height="14" rx="3"/><path d="M4 11h16M8 21v-3.5M16 21v-3.5"/><circle cx="8" cy="14.5" r=".6" fill="currentColor"/><circle cx="16" cy="14.5" r=".6" fill="currentColor"/></svg>${esc(info.campus)}校区小巴</div>
+    <p class="sc-sub">${sub}</p><div class="sc-map"><span class="spin"></span></div>
+    <div class="sc-legend"></div><p class="note sc-status"></p>`;
+  log.append(card); scrollDown(true);
+  const geo = shuttleGeo[info.campus] || await fetch(`/api/shuttle/map?campus=${encodeURIComponent(info.campus)}`)
+    .then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  if (!geo?.ok) { card.querySelector(".sc-map").innerHTML = '<p class="note">地图暂时取不到</p>'; return; }
+  shuttleGeo[info.campus] = geo;
+  const view = drawShuttleMap(card.querySelector(".sc-map"), geo, info);
+  const dirs = geo.directions || {};
+  const dirName = (d) => (dirs[d] ? `${d}（${dirs[d]}）` : d);
+  card.querySelector(".sc-legend").innerHTML =
+    `<span><i class="sc-dot cw"></i>${esc(dirName("顺时针"))}</span><span><i class="sc-dot ccw"></i>${esc(dirName("逆时针"))}</span>` +
+    (info.board ? '<span><i class="sc-ride"></i>建议乘车路段</span>' : "");
+  const status = card.querySelector(".sc-status");
+  let timer = null, startedAt = 0;
+  const stop = (why) => { clearInterval(timer); timer = null; status.innerHTML = `${why} · <a href="#" class="sc-refresh">查看实时位置</a>`; };
+  async function refresh() {
+    if (document.hidden) return;
+    if (Date.now() - startedAt > 5 * 60 * 1000) return stop("已暂停刷新");
+    const r = await fetch(`/api/shuttle/live?campus=${encodeURIComponent(info.campus)}`).then((x) => x.json()).catch(() => null);
+    if (!r?.ok) { view.setVehicles([]); status.textContent = "实时位置暂时查不到，图上只有线路和站点"; return; }
+    view.setVehicles(r.vehicles);
+    const t = new Date();
+    status.textContent = r.vehicles.length
+      ? `${r.vehicles.length} 辆在线 · ${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}:${String(t.getSeconds()).padStart(2, "0")} 更新 · 每 10 秒刷新`
+      : "现在没有在线的小巴（可能已收车）";
+  }
+  function start() {
+    if (shuttleActive && shuttleActive !== control) shuttleActive.pause();
+    shuttleActive = control; startedAt = Date.now();
+    clearInterval(timer); timer = setInterval(refresh, 10000); refresh();
+  }
+  const control = { pause: () => timer && stop("已暂停刷新") };
+  card.addEventListener("click", (e) => { if (e.target.closest(".sc-refresh")) { e.preventDefault(); start(); } });
+  if (live) start(); else stop("历史记录");
+  scrollDown();
+}
+
+function drawShuttleMap(box, geo, info) {
+  const pts = [...geo.line, ...geo.stops.map((s) => [s.e, s.n])];
+  const pad = 70;
+  const minE = Math.min(...pts.map((p) => p[0])) - pad, maxE = Math.max(...pts.map((p) => p[0])) + pad;
+  const minN = Math.min(...pts.map((p) => p[1])) - pad, maxN = Math.max(...pts.map((p) => p[1])) + pad;
+  const W = maxE - minE, H = maxN - minN;
+  const k = W / 520;               // 卡片大约 520px 宽：1px ≈ k 米，字号、线宽都按它换算
+  const X = (e) => e - minE, Y = (n) => maxN - n;  // 北在上
+  const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, class: "sc-svg", role: "img", "aria-label": `${geo.campus}校区小巴线路和实时位置` });
+  svg.append(svgEl("polyline", { class: "sc-route", points: geo.line.map(([e, n]) => `${X(e)},${Y(n)}`).join(" "), "stroke-width": 5 * k }));
+  const byName = {};
+  for (const s of geo.stops) for (const n of [s.name, ...(s.aka || [])]) byName[n] = s;
+  if (info.board && byName[info.board] && byName[info.alight]) {
+    const path = ridePath(geo, [info.board, ...(info.via || [])].map((n) => byName[n]).filter(Boolean), info.line || "");
+    svg.append(svgEl("polyline", { class: "sc-ridepath", points: path.map(([e, n]) => `${X(e)},${Y(n)}`).join(" "), "stroke-width": 6 * k }));
+  }
+  // 站点 + 标签（简单避让：右、左、上、下依次试，都挤就不写字；上下车站一定写）
+  const focus = { [info.board]: "on", [info.alight]: "off", [info.stop]: "on" };
+  const focusName = (s) => [s.name, ...(s.aka || [])].find((n) => focus[n]);  // 用回答里的叫法（四海楼 / 留学生楼）
+  const boxes = [], fs = 10.5 * k;
+  const stopsG = svgEl("g"), labelsG = svgEl("g", { class: "sc-labels" });
+  const ordered = [...geo.stops].sort((a, b) => (focusName(b) ? 1 : 0) - (focusName(a) ? 1 : 0));
+  for (const s of ordered) {
+    const fn = focusName(s), f = fn && focus[fn], x = X(s.e), y = Y(s.n);
+    stopsG.append(svgEl("circle", { cx: x, cy: y, r: (f ? 6 : 3.6) * k, class: `sc-stop ${f || ""}`, "stroke-width": 1.6 * k }));
+    const label = f ? `${f === "on" ? (info.board ? "上车 " : "") : "下车 "}${fn}` : s.name;
+    const w = label.length * fs * (f ? 1.05 : 1), h = fs * 1.2, gap = 6 * k;
+    const tries = [[x + gap, y + fs * 0.35, "start"], [x - gap, y + fs * 0.35, "end"], [x, y - gap, "middle"], [x, y + gap + fs, "middle"]];
+    for (const [tx, ty, anchor] of tries) {
+      const left = anchor === "start" ? tx : anchor === "end" ? tx - w : tx - w / 2;
+      const r = { l: left, r: left + w, t: ty - h * 0.85, b: ty + h * 0.15 };
+      if (r.l < 0 || r.r > W) continue;  // 别画出边界
+      if (!f && boxes.some((o) => r.l < o.r && r.r > o.l && r.t < o.b && r.b > o.t)) continue;
+      boxes.push(r);
+      labelsG.append(svgEl("text", { x: tx, y: ty, "text-anchor": anchor, "font-size": f ? fs * 1.08 : fs, class: f ? `sc-focus ${f}` : "" }, label));
+      break;
+    }
+  }
+  svg.append(stopsG, labelsG);
+  // 校门、地铁站：淡淡的参照，和站名挤在一起的就不写
+  const gl = svgEl("g", { class: "sc-landmarks" }), gs = 9.5 * k;
+  for (const g of geo.landmarks) {
+    const x = X(g.e), y = Y(g.n), w = g.name.length * gs;
+    const r = { l: x - w / 2, r: x + w / 2, t: y - gs, b: y + gs * 0.2 };
+    if (r.l < 0 || r.r > W || boxes.some((o) => r.l < o.r && r.r > o.l && r.t < o.b && r.b > o.t)) continue;
+    boxes.push(r);
+    gl.append(svgEl("text", { x, y, "font-size": gs, "text-anchor": "middle" }, g.name));
+  }
+  svg.insertBefore(gl, svg.firstChild);
+  const busG = svgEl("g", { class: "sc-buses" });
+  svg.append(busG);
+  // 指北
+  const nx = W - 26 * k, ny = 30 * k;
+  svg.append(svgEl("path", { d: `M${nx} ${ny - 14 * k} L${nx + 6 * k} ${ny} L${nx - 6 * k} ${ny} Z`, class: "sc-north" }),
+             svgEl("text", { x: nx, y: ny + 13 * k, "text-anchor": "middle", "font-size": 9 * k, class: "sc-north-t" }, "北"));
+  box.innerHTML = ""; box.append(svg);
+  return {
+    setVehicles(list) {
+      busG.replaceChildren();
+      for (const v of list) {
+        const g = svgEl("g", { class: `sc-bus ${v.direction === "顺时针" ? "cw" : v.direction === "逆时针" ? "ccw" : ""}`,
+                               transform: `translate(${X(v.e)},${Y(v.n)})` });
+        g.append(svgEl("title", {}, `${v.name}${v.direction ? ` · ${v.direction}` : ""}${v.moving ? "" : " · 停靠中"} · ${v.ageSeconds} 秒前的位置`));
+        if (v.heading != null && v.moving)
+          g.append(svgEl("path", { d: `M0 ${-15 * k} L${5 * k} ${-7 * k} L${-5 * k} ${-7 * k} Z`, transform: `rotate(${v.heading})`, class: "sc-heading" }));
+        g.append(svgEl("circle", { r: 7.5 * k, "stroke-width": 2 * k }));
+        g.append(svgEl("text", { y: 3.2 * k, "text-anchor": "middle", "font-size": 8 * k }, (v.name.match(/\d+/) || ["车"])[0]));
+        busG.append(g);
+      }
+    },
+  };
+}
+
+// 乘车路段沿线路折线画：从上车站最近的顶点，按乘车方向走到下车站。
+// 内环在北边抄近路、不经过折线上的北门那一段；沿折线走出来比站点连线长太多时，退回按站点连线画。
+function ridePath(geo, stops, line) {
+  const pts = geo.line, n = pts.length - 1;  // 首尾是同一个点
+  const near = (s) => { let b = 0, bd = Infinity; for (let i = 0; i < n; i++) { const d = Math.hypot(pts[i][0] - s.e, pts[i][1] - s.n); if (d < bd) { bd = d; b = i; } } return b; };
+  const chain = stops.map((s) => [s.e, s.n]);
+  const len = (a) => a.slice(1).reduce((t, p, i) => t + Math.hypot(p[0] - a[i][0], p[1] - a[i][1]), 0);
+  if (stops.length < 2 || !geo.order) return chain;
+  const forward = line.includes(geo.order);
+  const out = [];
+  for (let i = near(stops[0]), end = near(stops[stops.length - 1]), guard = 0; guard <= n; guard++) {
+    out.push(pts[i]);
+    if (i === end) break;
+    i = forward ? (i + 1) % n : (i - 1 + n) % n;
+  }
+  return len(out) > 1.6 * len(chain) ? chain : out;
+}
+
 // 确认卡片：展示服务端预览，而不是模型的转述
 function confirmRows(action) {
   const p = action.preview;
@@ -525,6 +677,7 @@ async function runTurn(url, body) {
   busy = true; updateSend();
   let bubble = null, steps = null, touched = new Set(), needLogin = false, mfaTarget = null, needContact = false, needVpn = false;
   const stepEls = {}, pendingBoards = {};
+  let shuttleCard = null;
   showThinking();
   const completed = await streamPost(url, body, (ev) => {
     switch (ev.type) {
@@ -568,6 +721,13 @@ async function runTurn(url, body) {
         if (ev.code === "WEBVPN_LOGIN_REQUIRED") needVpn = true;
         if (ev.code === "CONTACT_REQUIRED") needContact = true;
         if (ev.booking) addPayCard(ev.booking, confirmingCard);
+        if (ev.shuttleMap) {  // 同一轮查了几次小巴，只留最后一张
+          shuttleCard?.remove();
+          const before = log.lastElementChild;
+          addShuttleCard(ev.shuttleMap, true);
+          shuttleCard = log.lastElementChild !== before ? log.lastElementChild : null;
+          steps = null;
+        }
         else if (confirmingCard && /_confirm$/.test(ev.name)) confirmingCard.dataset.outcome = ev.ok ? "ok" : "fail";
         if (ev.code === "MFA_REQUIRED") mfaTarget = ev.target || mfaTarget;
         break;
@@ -646,6 +806,7 @@ async function restore() {
       const state = m.ok === undefined ? "run" : m.ok ? "ok" : "fail";
       steps.append(el("span", `step ${state === "run" ? "" : state}`, stepHtml(m.name, m.args, state)));
       if (m.booking) { addPayCard(m.booking); steps = null; }
+      if (m.shuttleMap) { addShuttleCard(m.shuttleMap, false); steps = null; }
     }
   }
   if (pending) addConfirm(pending);

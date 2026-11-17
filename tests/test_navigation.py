@@ -235,10 +235,66 @@ async def test_navigation_tools(home, monkeypatch):
 
         bus = await client("shuttle_status", campus="粤海", stop="汇典楼")  # 楼名换成最近的站
         assert bus["ok"] and bus["data"]["stop"] in {"汇星楼", "师范学院"}
-        assert len(bus["data"]["vehicles"]) == 2 and all("toStop" in v for v in bus["data"]["vehicles"])
+        assert len(bus["data"]["vehicles"]) == 3 and all("toStop" in v for v in bus["data"]["vehicles"])
         assert bus["data"]["intercampus"]["allTimes"][0] == "07:10"
         guide = bus["data"]["guide"]
         assert "1 元" in guide["fare"] and guide["hours"].startswith("06:30-23:30") and "非官方" in guide["source"]
         assert any("（校医院方向）" in v["direction"] or "（汇文楼方向）" in v["direction"] for v in bus["data"]["vehicles"])
         lihu = await client("shuttle_status", campus="丽湖")
         assert "guide" not in lihu["data"]
+
+
+# ------------------------------ 小巴地图卡片 ------------------------------ #
+
+def test_map_view_merges_alias_stops_and_drops_offroute_vehicles():
+    m = default_map()
+    v = m.map_view("粤海")
+    names = [s["name"] for s in v["stops"]]
+    assert len(names) == len(set(names)) and "四海楼" not in names  # 四海楼就是接口里的留学生楼：只画一个点
+    hai = next(s for s in v["stops"] if s["name"] == "留学生楼")
+    assert hai["aka"] == ["四海楼"] and "汇文楼方向" in hai["servedBy"]
+    assert v["order"] == "逆时针" and v["directions"]["顺时针"] == "校医院方向"
+    assert not {g["name"] for g in v["landmarks"]} & set(names)
+    assert "丽湖" == m.map_view("丽湖")["campus"] and m.map_view("丽湖")["directions"] == {}
+
+    frame, s0 = m.frames["粤海"], m.loops["粤海"].stops[0]
+    on = {"name": "1号车", "lat": frame.lat0 + s0.n / 110540.0, "lng": frame.lng0 + s0.e / frame.k,
+          "speedKmh": 12, "ageSeconds": 3, "direction": "clockwise", "heading": 90}
+    far = {**on, "name": "2号车", "lat": on["lat"] + 0.01}  # 离线路 1 公里：停车场或维修，不画
+    pts = m.vehicle_points("粤海", [on, far])
+    assert [p["name"] for p in pts] == ["1号车"] and pts[0]["direction"] == "顺时针" and pts[0]["heading"] == 90
+
+
+def test_mock_vehicles_move_along_the_route():
+    m = default_map()
+    a, b = shuttle.mock_vehicles("丽湖", now=1000.0), shuttle.mock_vehicles("丽湖", now=1030.0)
+    assert len(a) == 3 and {v["direction"] for v in a} == {"clockwise", "counterclockwise"}
+    assert all(p["e"] != q["e"] or p["n"] != q["n"] for p, q in zip(m.vehicle_points("丽湖", a), m.vehicle_points("丽湖", b)))
+    assert len(m.vehicle_points("丽湖", a)) == 3  # 都在线路上
+
+
+def test_shuttle_card_event_and_endpoints(home):
+    from fastapi.testclient import TestClient
+    from langchain_core.messages import ToolMessage
+
+    from szu_agent.agent.profile import ProfileStore
+    from szu_agent.web.app import _shuttle_map_from, create_app
+
+    from .conftest import ScriptedChatModel
+
+    def msg(name, data):
+        return ToolMessage(json.dumps({"ok": True, "data": data}, ensure_ascii=False), tool_call_id="c1", name=name)
+
+    assert _shuttle_map_from(msg("shuttle_status", {"campus": "粤海", "stop": "汇星楼"})) == {"campus": "粤海", "stop": "汇星楼"}
+    ride = {"from": {"campus": "粤海"}, "advice": "可以坐小巴：……",
+            "shuttle": {"board": "乔梧阁", "alight": "聚翰斋", "via": ["朝夕楼", "聚翰斋"], "line": "内环·汇文楼方向（逆时针）"}}
+    assert _shuttle_map_from(msg("campus_navigate", ride))["board"] == "乔梧阁"
+    assert _shuttle_map_from(msg("campus_navigate", {**ride, "advice": "建议直接走：……"})) is None  # 建议走路时不画
+    assert _shuttle_map_from(msg("campus_guide", {"campus": "粤海"})) is None
+
+    with TestClient(create_app(mock=True, llm=ScriptedChatModel(script=[]), profile=ProfileStore(home / "p.json"))) as client:
+        g = client.get("/api/shuttle/map", params={"campus": "粤海"}).json()  # 公开数据：不登录也能看
+        assert g["ok"] and len(g["line"]) > 50 and g["stops"]
+        live = client.get("/api/shuttle/live", params={"campus": "丽湖"}).json()
+        assert live["ok"] and len(live["vehicles"]) == 3 and {"e", "n", "direction"} <= set(live["vehicles"][0])
+        assert client.get("/api/shuttle/map", params={"campus": "罗湖"}).status_code == 400
