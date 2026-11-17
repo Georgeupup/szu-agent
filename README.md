@@ -6,6 +6,8 @@
 
 <p align="center"><sub>基于 LangGraph 智能体 + MCP 工具服务，自行实现统一身份认证与各业务系统的接口适配，不依赖浏览器自动化。</sub></p>
 
+<p align="center"><b>在线体验：<a href="https://aixiaoli.fun">aixiaoli.fun</a></b><br><sub>使用深大统一身份认证登录 · 每人每日设有用量额度</sub></p>
+
 <p align="center"><img src="docs/images/demo.gif" alt="演示：一句话预约羽毛球场，确认卡片 → 付款卡片" width="760"></p>
 
 <p align="center"><sub>演示模式录屏（样例数据）：一句话发起预约 → 确认卡片 → 付款卡片</sub></p>
@@ -68,6 +70,10 @@ bash setup-server.sh <服务器公网IP> [域名]   # 提供域名时自动申�
 
 - 宿舍电费查询协议参考 [szu-dianchacha](https://github.com/yuyiwei01/szu-dianchacha)（MIT License）
 - 健身房预约接口参考 [szu_gym_helper](https://github.com/Georgeupup/szu_gym_helper)
+
+## 许可证
+
+[MIT](LICENSE)
 
 ## 免责声明
 

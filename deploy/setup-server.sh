@@ -7,17 +7,22 @@
 #           域名只需第一次给（记在 /etc/nginx/ssl/szu-domain），之后更新代码照常 bash setup-server.sh <IP>
 #   访问学校经国内服务器转发（先在国内服务器上运行 setup-campus-proxy.sh）：
 #           CAMPUS_PROXY=http://国内IP:18888 bash setup-server.sh <IP>   （只需一次；CAMPUS_PROXY=off 关掉）
+#   不要演示站：DEMO=off bash setup-server.sh <IP>   （只需一次，记在 /etc/szu-agent/no-demo；DEMO=on 恢复）
+#           关掉后 http（80 端口）全部跳转到 https 的真实服务
 #
 # 做的事：建 szu 账号 → 装 nginx、uv → 解压代码 → uv sync → systemd 两个服务（真实服务多人模式、演示站）
 #        → 服务器密钥（已有就不动！换了所有人的 user_id 都会变）→ 证书 → nginx → 启动并自检
 # 证书：有域名且域名已解析到本机 → Let's Encrypt（certbot webroot，自动续期）；否则按 IP 自签名（已有就不动）。
-#       有域名时：https://域名 = 真实服务，http://域名 跳转到 https；演示站仍是 http://<IP>。
+#       有域名时：https://域名 = 真实服务，http://域名 跳转到 https；演示站（开着的话）是 http://<IP>。
 set -euo pipefail
 IP="${1:?用法：bash setup-server.sh <服务器公网IP> [域名]}"
 DOMAIN="${2:-}"
 case "$DOMAIN" in http://*|https://*) REAL_URL="$DOMAIN"; DOMAIN="";; esac   # 兼容旧用法：第二个参数是网址
 [ -n "$DOMAIN" ] || DOMAIN="$(cat /etc/nginx/ssl/szu-domain 2>/dev/null || true)"
 APP=/home/szu/szu-agent
+mkdir -p /etc/szu-agent
+case "${DEMO:-}" in off) touch /etc/szu-agent/no-demo;; on) rm -f /etc/szu-agent/no-demo;; esac
+if [ -f /etc/szu-agent/no-demo ]; then WITH_DEMO=""; else WITH_DEMO=1; fi
 UV=/home/szu/.local/bin/uv
 
 id szu >/dev/null 2>&1 || useradd -m -s /bin/bash szu
@@ -74,8 +79,22 @@ write_cert_inc() {
   fi > /etc/nginx/conf.d/szu-cert.inc
 }
 rm -f /etc/nginx/sites-enabled/default
-install -m 644 "$APP/deploy/nginx/szu-demo.conf" "$APP/deploy/nginx/szu-real.conf" "$APP/deploy/nginx/szu-proxy.inc" /etc/nginx/conf.d/
-rm -f /etc/nginx/conf.d/szu-domain.conf
+install -m 644 "$APP/deploy/nginx/szu-real.conf" "$APP/deploy/nginx/szu-proxy.inc" /etc/nginx/conf.d/
+rm -f /etc/nginx/conf.d/szu-domain.conf /etc/nginx/conf.d/szu-http.conf /etc/nginx/conf.d/szu-demo.conf
+if [ -n "$WITH_DEMO" ]; then
+  install -m 644 "$APP/deploy/nginx/szu-demo.conf" /etc/nginx/conf.d/
+else
+  # 没有演示站：http 全部跳到 https 的真实服务（证书验证路径除外）
+  mkdir -p /var/www/certbot
+  cat > /etc/nginx/conf.d/szu-http.conf <<NGINX
+server {
+    listen 80 default_server;
+    server_name _;
+    location /.well-known/acme-challenge/ { root /var/www/certbot; }
+    location / { return 301 https://${DOMAIN:-$IP}\$request_uri; }
+}
+NGINX
+fi
 if [ -n "$DOMAIN" ]; then
   mkdir -p /var/www/certbot
   # http://域名：只留证书验证用的路径，其余跳转到 https（演示站只在 http://<IP>）
@@ -125,14 +144,24 @@ mkdir -p /etc/systemd/system/szu-agent-demo.service.d
 printf '[Service]\nEnvironment=SZU_AGENT_REAL_URL=%s\n' "$REAL_URL" > /etc/systemd/system/szu-agent-demo.service.d/real-url.conf
 
 systemctl daemon-reload
-systemctl enable -q szu-agent szu-agent-demo
-systemctl restart szu-agent szu-agent-demo
+if [ -n "$WITH_DEMO" ]; then
+  systemctl enable -q szu-agent szu-agent-demo
+  systemctl restart szu-agent szu-agent-demo
+else
+  systemctl disable --now -q szu-agent-demo 2>/dev/null || true
+  systemctl enable -q szu-agent
+  systemctl restart szu-agent
+fi
 sleep 8
 
 echo "== 自检"
-systemctl is-active szu-agent szu-agent-demo nginx | paste -sd' '
+systemctl is-active szu-agent nginx | paste -sd' '
 echo "真实服务（应为 multiuser:true）：$(curl -sk https://127.0.0.1/api/meta)"
-echo "演示站（应为 mock:true）：      $(curl -s http://127.0.0.1/api/meta)"
+if [ -n "$WITH_DEMO" ]; then
+  echo "演示站（应为 mock:true）：      $(curl -s http://127.0.0.1/api/meta)"
+else
+  echo "演示站已关闭；http 跳转到：     $(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' http://127.0.0.1/)"
+fi
 if [ -f "$D/campus-proxy.conf" ]; then
   P="$(sed -n 's/^Environment=SZU_AGENT_CAMPUS_PROXY=//p' "$D/campus-proxy.conf")"
   echo "学校 直连：        $(curl -s -o /dev/null -w '首字节 %{time_starttransfer}s' https://ehall.szu.edu.cn/ || echo 失败)"
@@ -141,7 +170,7 @@ fi
 if [ -n "$HAVE_CERT" ]; then
   echo "正式证书（不加 -k 也应成功）：  $(curl -s --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/api/meta" || echo 失败)"
   echo "证书到期：$(openssl x509 -enddate -noout -in "$LE/fullchain.pem")（certbot.timer 自动续期：$(systemctl is-active certbot.timer)）"
-  echo "完成。真实服务 https://$DOMAIN ，演示站 http://$IP"
+  echo "完成。真实服务 https://$DOMAIN${WITH_DEMO:+ ，演示站 http://$IP}"
 else
-  echo "完成。真实服务 https://$IP （自签名证书，第一次要点“继续访问”），演示站 http://$IP"
+  echo "完成。真实服务 https://$IP （自签名证书，第一次要点“继续访问”）${WITH_DEMO:+，演示站 http://$IP}"
 fi

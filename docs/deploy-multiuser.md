@@ -38,6 +38,9 @@ ssh root@服务器 "bash /tmp/setup-server.sh 服务器公网IP"
 
 **更新代码**：同样打包上传到 `/tmp/szu-agent-upload.tgz`，再运行 `bash /home/szu/szu-agent/deploy/setup-server.sh 服务器公网IP`（不用再传 .env）。
 
+**不需要演示站时**：`DEMO=off bash setup-server.sh 服务器公网IP`（只需一次，`DEMO=on` 恢复）。会停掉 `szu-agent-demo`，
+http（80 端口）全部跳转到 https 的真实服务。
+
 **要备份到服务器以外的地方**：`multiuser.conf`（服务器密钥，丢了或换了所有人的数据都对不上）和 `.env`（模型 key）。
 
 **证书**：
