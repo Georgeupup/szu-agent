@@ -12,7 +12,7 @@ import os
 import re
 import secrets
 import time
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -28,6 +28,23 @@ from .contact import ContactStore
 from .session import SessionStore
 
 FIXTURES = Path(__file__).parent.parent / "mock_fixtures"
+SPORTS_FIXTURE_TODAY = date(2026, 11, 14)  # sports.json 录制时的“今天”（开放日期 11-14、11-15）
+
+
+def mock_today() -> date:
+    """演示数据的“今天”：默认北京时间今天；测试用 SZU_AGENT_MOCK_TODAY 固定（MCP 子进程也继承）。"""
+    if v := os.environ.get("SZU_AGENT_MOCK_TODAY"):
+        return date.fromisoformat(v)
+    from .booth import beijing_now
+    return beijing_now().date()
+
+
+def shift_dates(text: str, days: int) -> str:
+    """把样例里所有 YYYY-MM-DD 平移 days 天：演示站一直是“今天、明天可约”，不会因为样例日期过期而约不到。"""
+    if not days:
+        return text
+    return re.sub(r"\b20\d\d-\d\d-\d\d\b",
+                  lambda m: (date.fromisoformat(m.group(0)) + timedelta(days=days)).isoformat(), text)
 
 
 def _read(name: str) -> str:
@@ -125,7 +142,7 @@ class MockCampus:
         self._prebooks: list[dict[str, str]] = [
             {"fid": "", "ctrlno": "3351727", "title": "想念地坛", "pickup": "粤海校区南区致理楼C栋1层信息中心服务大厅取书柜",
              "date": "2026-11-14", "status": "读者取消"}]
-        self.sports = json.loads(_read("sports.json"))
+        self.sports = json.loads(shift_dates(_read("sports.json"), (mock_today() - SPORTS_FIXTURE_TODAY).days))
         self.electricity = json.loads(_read("electricity.json"))
         # 和真实接口 normalize_booking 一样的结构。
         # 预约在 MCP 进程里提交、付款卡片在 Web 进程里查询，所以订单状态存在文件里供两个进程共享

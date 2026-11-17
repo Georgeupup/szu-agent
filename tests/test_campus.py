@@ -1126,3 +1126,13 @@ async def test_offcampus_lecture_is_unavailable_for_now(monkeypatch, tmp_path):
     with pytest.raises(CampusError) as e:
         await http.request("GET", "https://lecture.szu.edu.cn/")
     assert e.value.code == "NETWORK_REQUIRED" and "服务器版" in e.value.message
+
+
+def test_mock_sports_dates_follow_today(monkeypatch, tmp_path):
+    # 演示站的场馆开放日期跟着今天走，不会因为样例过期而约不到
+    from szu_agent.campus.mock import MockCampus, shift_dates
+    assert shift_dates('{"d": "2026-11-15", "no": "202611091405"}', 3) == '{"d": "2026-11-18", "no": "202611091405"}'
+    monkeypatch.setenv("SZU_AGENT_MOCK_TODAY", "2027-03-01")
+    m = MockCampus(SessionStore(tmp_path / "s.json"))
+    assert m.sports["dates"] == ["2027-03-01", "2027-03-02"]
+    assert set(m.sports["slotsByDate"]) == {"2027-03-01", "2027-03-02"}

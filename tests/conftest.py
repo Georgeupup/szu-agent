@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any, Callable
 
 import httpx
@@ -11,6 +12,9 @@ from langchain_core.messages import AIMessage, BaseMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 
 from szu_agent.campus import SessionStore
+
+# 演示数据按“今天”平移日期；测试固定在样例录制当天，断言里的 2026-11-14/15 才成立（MCP 子进程继承环境变量）
+os.environ["SZU_AGENT_MOCK_TODAY"] = "2026-11-14"
 
 Step = AIMessage | Callable[[list[BaseMessage]], AIMessage]
 
