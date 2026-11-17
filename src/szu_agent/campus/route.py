@@ -19,6 +19,9 @@ from .debuglog import log
 
 ENV = "SZU_AGENT_CAMPUS_PROXY"
 RETRY_AFTER = 60.0
+# 连转发服务器的超时：首尔到广州往返 84ms，3 秒足够。安全组拦截时是丢包不回应，
+# 用请求本来的 20 秒连接超时的话，转发不可用期间每分钟会有一个请求卡 20 秒
+PROXY_CONNECT_TIMEOUT = 3.0
 
 
 def is_campus_host(host: str) -> bool:
@@ -33,15 +36,25 @@ class CampusRouteTransport(httpx.AsyncBaseTransport):
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
         if is_campus_host(request.url.host) and time.monotonic() >= self.down_until:
+            original = request.extensions.get("timeout")
+            timeout = dict(original or {})
+            timeout["connect"] = min(timeout.get("connect") or PROXY_CONNECT_TIMEOUT, PROXY_CONNECT_TIMEOUT)
+            request.extensions["timeout"] = timeout
             try:
                 return await self.via.handle_async_request(request)
             except (httpx.ConnectError, httpx.ConnectTimeout) as exc:
                 # 连不上转发服务器本身：这段时间都直连。请求还没发出去，改直连重发是安全的
                 self.down_until = time.monotonic() + RETRY_AFTER
                 log().info("转发服务器连不上（%s），%d 秒内直连", type(exc).__name__, RETRY_AFTER)
+            # 读取超时不改直连：那时请求可能已经发到学校，重发会让预约之类的写操作提交两次
             except httpx.ProxyError as exc:
                 # 转发服务器在，但拒绝或连不到这个地址（比如只在内网的系统）：这一次直连，不影响其他请求
                 log().info("转发拒绝 %s（%s），本次直连", request.url.host, exc)
+            finally:
+                if original is None:
+                    request.extensions.pop("timeout", None)
+                else:
+                    request.extensions["timeout"] = original  # 直连仍用原来的超时
         return await self.direct.handle_async_request(request)
 
     async def aclose(self) -> None:

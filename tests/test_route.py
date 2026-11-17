@@ -17,6 +17,7 @@ class Recorder(httpx.AsyncBaseTransport):
 
     async def handle_async_request(self, request):
         self.hosts.append(request.url.host)
+        self.connect_timeout = request.extensions["timeout"]["connect"]
         if self.fail:
             raise self.fail
         return httpx.Response(200, text=self.name)
@@ -76,3 +77,11 @@ async def test_school_clients_use_route_when_configured(monkeypatch, tmp_path, m
     client = make_client(SessionStore(tmp_path / "session.json"))
     assert isinstance(client._transport, CampusRouteTransport)
     await client.aclose()
+
+
+async def test_proxy_connect_timeout_short_direct_keeps_original():
+    t = make(httpx.ConnectTimeout("dropped"))
+    async with httpx.AsyncClient(transport=t, timeout=httpx.Timeout(30, connect=20)) as c:
+        await c.get("https://ehall.szu.edu.cn/a")
+    assert t.via.connect_timeout == route.PROXY_CONNECT_TIMEOUT
+    assert t.direct.connect_timeout == 20
