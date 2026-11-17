@@ -110,6 +110,8 @@
 :root { --sky-ink: #1E1828; --sky-ink-2: rgba(30, 24, 40, .78); --scrim: rgba(255, 255, 255, .4); }
 :root[data-ink="light"] { --sky-ink: #F5F1FB; --sky-ink-2: rgba(245, 241, 251, .82); --scrim: rgba(14, 10, 30, .4); }
 .side, .empty { color: var(--sky-ink); position: relative; isolation: isolate; }
+/* 下面的柔光向两侧伸出 110px：裁掉横向溢出，否则手机上页面会变宽、整体被缩小（顶栏和输入框错位） */
+main { overflow-x: clip; }
 .side::before, .empty::before {
   content: ""; position: absolute; inset: -70px -110px; z-index: -1; pointer-events: none;
   background: radial-gradient(closest-side, var(--scrim), transparent);

@@ -936,7 +936,7 @@ function renderMfaStep(state, mfaId, info) {
       <button class="btn primary" type="submit">验证</button>
       <p class="login-err" hidden></p>
     </form>
-    <p class="note">验证码由本机直接发给深大统一认证，不会发给 AI 模型。</p>`;
+    <p class="note">${multiuser ? "验证码经服务器转发给深大统一认证" : "验证码由本机直接发给深大统一认证"}，不会保存，也不会发给 AI 模型。</p>`;
   const form = card.querySelector("form"), err = form.querySelector(".login-err"), sendBtn = form.querySelector(".send-code");
   // 第一步默认企业微信；之后的步骤默认学校页面当前选中的方式（通常就是它要求的那种）
   let method = (info.step > 1 && methods.find((m) => m.type === info.current)) ? info.current
@@ -1005,7 +1005,7 @@ function addContactCard({ resume }) {
       <button class="btn primary" type="submit">保存</button>
       <p class="login-err" hidden></p>
     </form>
-    <p class="note">图书馆预借、事务中心空间预约会用到。只保存在你自己的电脑上，不会发给 AI 模型（AI 只能看到 138****5678 这样的形式）。</p>`;
+    <p class="note">图书馆预借、事务中心空间预约会用到。${multiuser ? "保存在服务器上，只有你自己能用" : "只保存在你自己的电脑上"}，不会发给 AI 模型（AI 只能看到 138****5678 这样的形式）。</p>`;
   log.append(card); scrollDown(true);
   const form = card.querySelector("form");
   form.phone.focus();
@@ -1086,6 +1086,7 @@ Promise.all([refreshAuth(), fetch("/api/meta").then((r) => r.json()).catch(() =>
     b.hidden = false;
   }
   const where = multiuser ? "保存在服务器上，只有你自己能看到" : "保存在你自己的电脑上";
+  if (multiuser) $("#memoryNote").textContent = "保存在服务器上，只有你自己能看到。学号、姓名、密码这类信息不会被记录。";
   $("#historyNote").textContent = `${where}，${m.historyDays > 0 ? `超过 ${m.historyDays} 天自动删除` : "不会自动删除"}。登录密码和验证码从不进入对话，所以也不会出现在这里。`;
   if (multiuser && !auth.appSession) addLoginCard({ resume: false });
   else refreshQuota();
