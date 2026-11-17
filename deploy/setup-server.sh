@@ -149,6 +149,7 @@ if [ -n "$WITH_DEMO" ]; then
   systemctl restart szu-agent szu-agent-demo
 else
   systemctl disable --now -q szu-agent-demo 2>/dev/null || true
+  systemctl reset-failed szu-agent-demo 2>/dev/null || true
   systemctl enable -q szu-agent
   systemctl restart szu-agent
 fi
