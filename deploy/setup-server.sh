@@ -3,13 +3,18 @@
 #
 #   本机：tar 打包项目（排除 .venv/.venv-win/.env/resource/缓存）→ scp 到服务器 /tmp/szu-agent-upload.tgz
 #         .env 单独 scp 到 /tmp/szu-agent.env（只有第一次需要）
-#   服务器：bash setup-server.sh <服务器公网IP> [真实服务网址，默认 https://<IP>]
+#   服务器：bash setup-server.sh <服务器公网IP> [域名]
+#           域名只需第一次给（记在 /etc/nginx/ssl/szu-domain），之后更新代码照常 bash setup-server.sh <IP>
 #
 # 做的事：建 szu 账号 → 装 nginx、uv → 解压代码 → uv sync → systemd 两个服务（真实服务多人模式、演示站）
-#        → 服务器密钥（已有就不动！换了所有人的 user_id 都会变）→ 自签名证书（已有就不动）→ nginx → 启动并自检
+#        → 服务器密钥（已有就不动！换了所有人的 user_id 都会变）→ 证书 → nginx → 启动并自检
+# 证书：有域名且域名已解析到本机 → Let's Encrypt（certbot webroot，自动续期）；否则按 IP 自签名（已有就不动）。
+#       有域名时：https://域名 = 真实服务，http://域名 跳转到 https；演示站仍是 http://<IP>。
 set -euo pipefail
-IP="${1:?用法：bash setup-server.sh <服务器公网IP> [真实服务网址]}"
-REAL_URL="${2:-https://$IP}"
+IP="${1:?用法：bash setup-server.sh <服务器公网IP> [域名]}"
+DOMAIN="${2:-}"
+case "$DOMAIN" in http://*|https://*) REAL_URL="$DOMAIN"; DOMAIN="";; esac   # 兼容旧用法：第二个参数是网址
+[ -n "$DOMAIN" ] || DOMAIN="$(cat /etc/nginx/ssl/szu-domain 2>/dev/null || true)"
 APP=/home/szu/szu-agent
 UV=/home/szu/.local/bin/uv
 
@@ -47,11 +52,7 @@ if [ ! -f "$D/multiuser.conf" ]; then
   umask 022
 fi
 chmod 600 "$D/multiuser.conf"
-# 演示站上显示“去真实服务”的链接
-mkdir -p /etc/systemd/system/szu-agent-demo.service.d
-printf '[Service]\nEnvironment=SZU_AGENT_REAL_URL=%s\n' "$REAL_URL" > /etc/systemd/system/szu-agent-demo.service.d/real-url.conf
-
-# 自签名证书（有域名后用 certbot 换掉）
+# 自签名证书（没有域名、或域名证书还没申请下来时用）
 mkdir -p /etc/nginx/ssl && chmod 700 /etc/nginx/ssl
 if [ ! -f /etc/nginx/ssl/szu-selfsigned.crt ]; then
   openssl req -x509 -newkey rsa:2048 -nodes -days 365 -subj "/CN=$IP" -addext "subjectAltName=IP:$IP" \
@@ -59,19 +60,74 @@ if [ ! -f /etc/nginx/ssl/szu-selfsigned.crt ]; then
   chmod 600 /etc/nginx/ssl/szu-selfsigned.key
 fi
 
-# nginx
+# nginx：szu-real.conf 通过 szu-cert.inc 引用证书，这里按有没有正式证书生成
+LE=/etc/letsencrypt/live/$DOMAIN
+write_cert_inc() {
+  if [ -n "$DOMAIN" ] && [ -f "$LE/fullchain.pem" ]; then
+    printf 'ssl_certificate     %s/fullchain.pem;\nssl_certificate_key %s/privkey.pem;\n' "$LE" "$LE"
+    # 只走 https：防止有人在 http 页面输密码（2026-11-16 的事故）
+    echo 'add_header Strict-Transport-Security "max-age=31536000" always;'
+  else
+    printf 'ssl_certificate     /etc/nginx/ssl/szu-selfsigned.crt;\nssl_certificate_key /etc/nginx/ssl/szu-selfsigned.key;\n'
+  fi > /etc/nginx/conf.d/szu-cert.inc
+}
 rm -f /etc/nginx/sites-enabled/default
 install -m 644 "$APP/deploy/nginx/szu-demo.conf" "$APP/deploy/nginx/szu-real.conf" "$APP/deploy/nginx/szu-proxy.inc" /etc/nginx/conf.d/
+rm -f /etc/nginx/conf.d/szu-domain.conf
+if [ -n "$DOMAIN" ]; then
+  mkdir -p /var/www/certbot
+  # http://域名：只留证书验证用的路径，其余跳转到 https（演示站只在 http://<IP>）
+  cat > /etc/nginx/conf.d/szu-domain.conf <<NGINX
+server {
+    listen 80;
+    server_name $DOMAIN;
+    location /.well-known/acme-challenge/ { root /var/www/certbot; }
+    location / { return 301 https://\$host\$request_uri; }
+}
+NGINX
+fi
+write_cert_inc
 nginx -t -q
+systemctl enable -q nginx
+systemctl reload nginx 2>/dev/null || systemctl restart nginx
+
+if [ -n "$DOMAIN" ] && [ ! -f "$LE/fullchain.pem" ]; then
+  RESOLVED="$(getent ahostsv4 "$DOMAIN" | awk 'NR==1{print $1}')"
+  if [ "$RESOLVED" != "$IP" ]; then
+    echo "!! $DOMAIN 解析到 '${RESOLVED:-无}'，不是 $IP：先去域名控制台加 A 记录，生效后再运行 bash setup-server.sh $IP $DOMAIN。暂用自签名证书"
+  else
+    command -v certbot >/dev/null || apt-get install -y -qq certbot >/dev/null
+    # 不留邮箱（Let's Encrypt 已不发到期提醒；续期由 certbot.timer 自动做）。要留就设 CERTBOT_EMAIL
+    if [ -n "${CERTBOT_EMAIL:-}" ]; then MAIL=(--email "$CERTBOT_EMAIL"); else MAIL=(--register-unsafely-without-email); fi
+    if certbot certonly --webroot -w /var/www/certbot -d "$DOMAIN" --non-interactive --agree-tos "${MAIL[@]}" \
+         --deploy-hook "systemctl reload nginx"; then
+      echo "$DOMAIN" > /etc/nginx/ssl/szu-domain
+      write_cert_inc && nginx -t -q && systemctl reload nginx
+    else
+      echo "!! 证书申请失败（看上面 certbot 的输出；连续失败有频率限制，查清原因再重试）。暂用自签名证书"
+    fi
+  fi
+fi
+if [ -n "$DOMAIN" ] && [ -f "$LE/fullchain.pem" ]; then HAVE_CERT=1; REAL_URL="${REAL_URL:-https://$DOMAIN}"
+else HAVE_CERT=""; REAL_URL="${REAL_URL:-https://$IP}"; fi
+
+# 演示站上显示“去真实服务”的链接
+mkdir -p /etc/systemd/system/szu-agent-demo.service.d
+printf '[Service]\nEnvironment=SZU_AGENT_REAL_URL=%s\n' "$REAL_URL" > /etc/systemd/system/szu-agent-demo.service.d/real-url.conf
 
 systemctl daemon-reload
-systemctl enable -q szu-agent szu-agent-demo nginx
+systemctl enable -q szu-agent szu-agent-demo
 systemctl restart szu-agent szu-agent-demo
-systemctl reload nginx || systemctl restart nginx
 sleep 8
 
 echo "== 自检"
 systemctl is-active szu-agent szu-agent-demo nginx | paste -sd' '
 echo "真实服务（应为 multiuser:true）：$(curl -sk https://127.0.0.1/api/meta)"
 echo "演示站（应为 mock:true）：      $(curl -s http://127.0.0.1/api/meta)"
-echo "完成。真实服务 https://$IP （自签名证书，第一次要点“继续访问”），演示站 http://$IP"
+if [ -n "$HAVE_CERT" ]; then
+  echo "正式证书（不加 -k 也应成功）：  $(curl -s --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/api/meta" || echo 失败)"
+  echo "证书到期：$(openssl x509 -enddate -noout -in "$LE/fullchain.pem")（certbot.timer 自动续期：$(systemctl is-active certbot.timer)）"
+  echo "完成。真实服务 https://$DOMAIN ，演示站 http://$IP"
+else
+  echo "完成。真实服务 https://$IP （自签名证书，第一次要点“继续访问”），演示站 http://$IP"
+fi

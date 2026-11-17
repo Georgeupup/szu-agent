@@ -46,7 +46,7 @@ uv run szu-agent-web            # 真实模式
 
 ```bash
 # 本机打包上传后，在服务器上（Ubuntu 22.04 / 24.04）：
-bash setup-server.sh <服务器公网IP>
+bash setup-server.sh <服务器公网IP> [域名]   # 有域名会自动申请 Let's Encrypt 证书
 ```
 
 一键脚本会装好服务、HTTPS 和限流。完整步骤、配置项和注意事项见 [部署说明](docs/deploy-multiuser.md)。

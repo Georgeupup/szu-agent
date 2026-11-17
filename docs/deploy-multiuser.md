@@ -40,8 +40,19 @@ ssh root@服务器 "bash /tmp/setup-server.sh 服务器公网IP"
 
 **要备份到服务器以外的地方**：`multiuser.conf`（服务器密钥，丢了或换了所有人的数据都对不上）和 `.env`（模型 key）。
 
-**没有域名时**是按 IP 签发的自签名证书，浏览器第一次会提示不受信任。有域名后：`apt install certbot python3-certbot-nginx`，
-把 `szu-real.conf` 的 `server_name` 改成域名，`certbot --nginx -d 域名` 换成正式证书。境内服务器用域名要先 ICP 备案。
+**证书**：
+
+- 没有域名：按 IP 签发的自签名证书，浏览器第一次会提示不受信任。
+- 有域名：先在域名控制台加 A 记录指向服务器 IP（等 `ping 域名` 显示的是这台服务器），再运行
+  `bash setup-server.sh 服务器公网IP 域名`。脚本会确认域名已解析到本机，用 certbot（webroot 方式，不改 nginx 配置）申请
+  Let's Encrypt 证书，之后 `certbot.timer` 自动续期、续期后自动 reload nginx。
+  域名记在 `/etc/nginx/ssl/szu-domain`，以后更新代码照常只传 IP。
+  有域名后：`https://域名` 是真实服务（带 HSTS），`http://域名` 跳转到 https，演示站仍是 `http://IP`。
+  默认不给 Let's Encrypt 留邮箱；想留就加环境变量 `CERTBOT_EMAIL=...`。
+- 境内服务器用域名要先 ICP 备案（未备案的域名指向境内服务器，80/443 会被云厂商拦截，证书也申请不下来）。
+
+**换服务器（比如备案通过后从首尔迁到境内）**：要把旧服务器的 `multiuser.conf`（服务器密钥）和 `/home/szu/.szu-agent/`
+整个拷过去，否则所有人的 user_id 都会变，历史和记忆对不上。先停旧服务再拷，避免两边同时写。
 
 ## 必须 HTTPS
 
