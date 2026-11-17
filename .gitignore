@@ -14,3 +14,6 @@ resource/promo/*.mp3
 *.sqlite
 *.sqlite-*
 resource/xiaohongshu/
+
+# 给 Claude 的交接说明，含部署细节，只留在本地
+CLAUDE.md
