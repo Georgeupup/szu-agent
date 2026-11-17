@@ -688,6 +688,24 @@ def create_server(campus: Any = None) -> FastMCP:
         return await call(svc.course_today(day))
 
     @mcp.tool(annotations=READ_ONLY)
+    async def grades_query(
+        term: Annotated[str | None, Field(
+            description="学期：“latest”=最近一个有成绩的学期；也可以写“2025-2026-1”（学年-第几学期）或学期名的一部分，如“2025-2026学年第一学期”；"
+                        "不填返回全部学期")] = None,
+    ) -> dict[str, Any]:
+        """查询研究生课程成绩：每门课的成绩、学分、绩点，按学期分组；每学期和全部课程（overall）的总学分、学分加权平均分。
+        用于“成绩出了吗”“这学期考得怎么样”“加权平均分 / 绩点多少”。只支持研究生（研究生院成绩系统），本科生成绩还没接入。
+        gpa 为 null 表示学校页面没显示（部分）绩点：如实说明，不要按分数自己换算绩点。
+        “出分了没”：用 term="latest" 看最新学期有哪些课已经有成绩。"""
+        res = await call(svc.grades(term))
+        if res["ok"]:
+            for group in res["data"]["terms"]:
+                # 省 token：去掉空字段和“正常考试”（只有补考、重修之类才值得说）
+                group["courses"] = [{k: v for k, v in c.items() if v is not None and not (k == "examType" and v == "正常考试")}
+                                    for c in group["courses"]]
+        return res
+
+    @mcp.tool(annotations=READ_ONLY)
     async def library_search(
         keyword: Annotated[str, Field(description="书名、作者或主题关键词")],
         limit: Annotated[int, Field(ge=1, le=20)] = 5,

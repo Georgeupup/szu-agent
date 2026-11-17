@@ -558,3 +558,101 @@ def parse_my_prebooks(html: str) -> dict[str, Any]:
     pages = soup.find(id=re.compile(r"gplbl2$"))
     return {"page": int(_num(clean(page.get_text())) or 1) if page else 1,
             "pages": int(_num(clean(pages.get_text())) or 1) if pages else 1, "items": items}
+
+
+# ------------------------------------------------------------------ 研究生成绩（研究生院 szdxwdcjapp）
+# 接口：2026-11-17 浏览器抓包；字段名参考 szu-score-helper，2026-11-17 真实账号自检（check grades）确认：
+#   POST /gsapp/sys/szdxwdcjapp/modules/wdcj/xscjcx.do，EMAP 标准分页 → datas.xscjcx.{totalSize, rows}，一行 49 个字段
+#   KCMC 课程名  XF 学分  CJ 成绩（可能是“优秀”“通过”）  DYBFZCJ 对应百分制成绩  JDZ 绩点  KCLBMC 课程类别
+#   XNXQDM 学期代码（20251 = 2025-2026 学年第一学期）/ XNXQDM_DISPLAY “2025-2026学年 第一学期”  KSXZDM_DISPLAY 考试性质
+#   BY1~BY10 是空的备用字段；XH 学号、LRRXM/CZRXM/FZJSXM 录入人/操作人/教师姓名，一律不取
+# JDZ 实测有值；万一学校不给就是 None，不推算（不用“按 JDZ 条件反复筛选”的办法反推学校没显示的绩点）。
+
+def parse_grade_page(body: Any) -> tuple[list[dict[str, Any]], int]:
+    """一页 xscjcx.do 的响应 → (原始行, totalSize)。结构不对就报 PAGE_CHANGED，不返回半截数据。"""
+    from .errors import CampusError
+
+    data = (body.get("datas") or {}).get("xscjcx") if isinstance(body, dict) else None
+    if not isinstance(data, dict) or not isinstance(data.get("rows"), list):
+        code = body.get("code") if isinstance(body, dict) else None
+        msg = str(body.get("msg") or "") if isinstance(body, dict) else ""
+        raise CampusError("PAGE_CHANGED", f"成绩接口返回的结构和预期不一致（code={code}{'，' + msg if msg else ''}）")
+    rows = [r for r in data["rows"] if isinstance(r, dict)]
+    return rows, int(_num(data.get("totalSize")) or len(rows))
+
+
+def normalize_grade(row: dict[str, Any]) -> dict[str, Any]:
+    """白名单取字段：学号（XH）、姓名（XM）等身份字段在这里就丢掉。"""
+    def text(key: str) -> str | None:
+        v = row.get(key)
+        return str(v).strip() or None if v is not None else None
+
+    return {
+        "termCode": text("XNXQDM"),
+        "term": text("XNXQDM_DISPLAY") or text("XNXQDM"),
+        "course": text("KCMC"),
+        "credit": _num(row.get("XF")),
+        "score": text("CJ") or text("DYBFZCJ"),  # 照学校显示的写法
+        "scorePercent": _num(row.get("DYBFZCJ")) if _num(row.get("DYBFZCJ")) is not None else _num(row.get("CJ")),
+        "gradePoint": _num(row.get("JDZ")),
+        "category": text("KCLBMC"),
+        "examType": text("KSXZDM_DISPLAY"),
+    }
+
+
+def _term_key(text: str) -> str:
+    """用户写的学期 → 便于匹配的形式：去空格；“2025-2026-1”转成学校的学期代码“20251”。"""
+    text = re.sub(r"\s+", "", text)
+    if m := re.fullmatch(r"(\d{4})-\d{4}-([12])", text):
+        return m[1] + m[2]
+    return text
+
+
+def _grade_summary(courses: list[dict[str, Any]]) -> dict[str, Any]:
+    """按学分加权。只用学校给了的数：没有百分制成绩的课（“通过”）不进平均分和 GPA。"""
+    with_credit = [c for c in courses if c["credit"]]
+    scored = [c for c in with_credit if c["scorePercent"] is not None]
+    pointed = [c for c in with_credit if c["gradePoint"] is not None]
+
+    def avg(rows: list[dict[str, Any]], key: str) -> float | None:
+        total = sum(c["credit"] for c in rows)
+        return round(sum(c["credit"] * c[key] for c in rows) / total, 2) if total else None
+
+    # 只有一部分课有绩点时不给 GPA：拿半数课程算出来的数会被当成真的 GPA 报给用户
+    missing = len([c for c in scored if c["gradePoint"] is None])
+    return {"courseCount": len(courses), "credits": round(sum(c["credit"] for c in with_credit), 2),
+            "weightedScore": avg(scored, "scorePercent"), "gpa": avg(pointed, "gradePoint") if not missing else None,
+            "gradePointMissing": missing}
+
+
+def build_grade_report(rows: list[dict[str, Any]], term: str | None = None) -> dict[str, Any]:
+    """原始行 → 按学期分组的成绩单（新学期在前）+ 汇总。
+
+    term：None = 全部；"latest" = 最近一个有成绩的学期；其他 = 学期名或代码的一部分（忽略空格）。
+    overall 永远是全部课程的汇总（问“总加权”时不用再查一次）。"""
+    courses = [normalize_grade(r) for r in rows]
+    order: list[tuple[str, str]] = []
+    for c in courses:
+        key = (c["termCode"] or "", c["term"] or "未标学期")
+        if key not in order:
+            order.append(key)
+    order.sort(key=lambda k: k[0], reverse=True)
+    all_terms = [name for _, name in order]
+
+    picked = order
+    if term == "latest":
+        picked = order[:1]
+    elif term:
+        want = _term_key(term)
+        picked = [k for k in order if want in k[0] or want in re.sub(r"\s+", "", k[1])]
+
+    groups = []
+    for code, name in picked:
+        items = [c for c in courses if (c["termCode"] or "", c["term"] or "未标学期") == (code, name)]
+        groups.append({"term": name, **_grade_summary(items),
+                       "courses": [{k: c[k] for k in ("course", "credit", "score", "scorePercent", "gradePoint", "category", "examType")}
+                                   for c in items]})
+    report: dict[str, Any] = {"terms": groups, "overall": _grade_summary(courses), "availableTerms": all_terms}
+    if term and not groups:
+        report["hint"] = f"没有和“{term}”对应的学期，可选的学期见 availableTerms"
+    return report

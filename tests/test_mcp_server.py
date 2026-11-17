@@ -103,6 +103,21 @@ async def test_electricity_and_course(logged_in):
         assert (await client("course_today", date="13/11"))["error"]["code"] == "BAD_DATE"
 
 
+async def test_grades_query_trims_output(logged_in):
+    async with mcp_client(logged_in) as client:
+        res = await client("grades_query", term="latest")
+        group = res["data"]["terms"][0]
+        assert group["term"] == "2025-2026学年 第二学期" and group["gpa"] == 3.9
+        assert all("examType" not in c for c in group["courses"])  # “正常考试”被裁掉
+        lunwen = next(c for c in res["data"]["terms"][0]["courses"] if c["course"] == "自然语言处理")
+        assert lunwen["category"] == "非学位课"
+        first = (await client("grades_query", term="2025-2026-1"))["data"]["terms"][0]
+        pass_fail = next(c for c in first["courses"] if c["course"] == "论文写作与学术规范")
+        assert pass_fail == {"course": "论文写作与学术规范", "credit": 1, "score": "通过", "category": "必修环节"}  # 空字段被裁掉
+        assert res["data"]["overall"]["courseCount"] == 8
+        assert "2099123456" not in str(res) and "张三" not in str(res)
+
+
 def test_pending_store_expiry(monkeypatch):
     store = PendingStore()
     token = store.create("reserve", {})

@@ -20,7 +20,7 @@ from .contact import ContactStore
 from .errors import CampusError
 from .http import CampusHttp, decode, is_login_page, select_options
 from .parsers import (
-    BOARD_URL, OPAC_URL, build_courses, notice_stats, courses_on, lecture_progress, normalize_lecture,
+    BOARD_URL, OPAC_URL, build_courses, build_grade_report, parse_grade_page, notice_stats, courses_on, lecture_progress, normalize_lecture,
     MODE_CODES, MODE_NAMES, normalize_booking, normalize_field, normalize_slot, parse_sports_catalog, parse_library_book, parse_library_search, parse_sims_page, parse_sims_room_id, reference_price, parse_notice_detail, parse_notice_list,
 )
 
@@ -34,6 +34,10 @@ SELF_MONEY = f"{SPORTS_APP}/modules/myBooking/getSelfMoney.do"
 CANCEL_BOOKING = f"{SPORTS_APP}/sportVenue/cancelSelectBookingInfo.do"
 PAY_DEADLINE_MINUTES = 45  # 学校脚本注释：个人包场、个人散场预约后 45 分钟内未支付，系统将自动取消
 COURSE_APP = f"{EHALL}/jwapp/sys/wdkb"
+GRADE_APP = f"{EHALL}/gsapp/sys/szdxwdcjapp"  # 研究生院“我的成绩”
+GRADE_PAGE = f"{GRADE_APP}/*default/index.do"
+GRADE_LIST = f"{GRADE_APP}/modules/wdcj/xscjcx.do"
+GRADE_PAGE_SIZE = 100
 
 ATTACHMENT_MAX_BYTES = 30 * 1024 * 1024
 
@@ -303,6 +307,29 @@ class RealCampus:
         except (ValueError, KeyError, TypeError) as exc:
             raise CampusError("PAGE_CHANGED", "课表接口和预期不一致（该接口尚未用真实账号验证，需要抓包确认）") from exc
         return courses_on(build_courses(api), day)
+
+    # ------------------------------------------------------------ 研究生成绩（2026-11-17 抓包 + 真实账号自检）
+
+    async def grades(self, term: str | None = None) -> dict[str, Any]:
+        """研究生院成绩系统。先进应用首页（单点登录后拿到 /gsapp/ 路径下的 MOD_AUTH_CAS、_WEU），再分页拉 xscjcx.do。
+        浏览器默认请求体是 pageSize=10&pageNumber=1（抓包 content-length 24）；这里每页 100 条、最多 5 页。
+        查询结果走 5 分钟缓存：用户反复问“出分了没”时不会每次都打学校。"""
+        await self.http.request("GET", GRADE_PAGE, cache=True)
+        rows: list[dict[str, Any]] = []
+        for page in range(1, 6):
+            resp = await self.http.request("POST", GRADE_LIST, cache=True,
+                                           data={"pageSize": str(GRADE_PAGE_SIZE), "pageNumber": str(page)},
+                                           headers={"X-Requested-With": "XMLHttpRequest", "Referer": GRADE_PAGE})
+            try:
+                body = resp.json()
+            except ValueError as exc:
+                # 本科生账号、或者学校改了入口时会落在一个 HTML 页面上
+                raise CampusError("PAGE_CHANGED", "研究生成绩接口没有返回 JSON（这个系统只对研究生开放）", url=GRADE_PAGE) from exc
+            chunk, total = parse_grade_page(body)
+            rows += chunk
+            if not chunk or len(rows) >= total:
+                break
+        return {**build_grade_report(rows, term), "url": GRADE_PAGE}
 
     # ------------------------------------------------------------ 体育预约（全部项目，接口和参数来自学校公开前端脚本）
     #   getSportVenueData.do  校区 / 项目目录          getRqList.do     可约日期

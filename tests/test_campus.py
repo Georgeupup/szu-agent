@@ -1136,3 +1136,78 @@ def test_mock_sports_dates_follow_today(monkeypatch, tmp_path):
     m = MockCampus(SessionStore(tmp_path / "s.json"))
     assert m.sports["dates"] == ["2027-03-01", "2027-03-02"]
     assert set(m.sports["slotsByDate"]) == {"2027-03-01", "2027-03-02"}
+
+
+# ------------------------------------------------------------------ 研究生成绩
+
+def grade_server(seen, rows, *, json_api=True):
+    def handler(req):
+        seen.append((req.method, req.url.path.rsplit("/", 1)[-1], req.content.decode(), req.headers.get("x-requested-with")))
+        if req.url.path.endswith("/index.do"):
+            return httpx.Response(200, text="<html>我的成绩</html>", headers={"set-cookie": "_WEU=abc; path=/gsapp/"})
+        if req.url.path.endswith("/xscjcx.do"):
+            if not json_api:  # 本科生账号 / 入口变了：落在 HTML 页面上
+                return httpx.Response(200, text="<html>您没有访问该应用的权限</html>")
+            q = parse_qs(req.content.decode())
+            size, page = int(q["pageSize"][0]), int(q["pageNumber"][0])
+            return httpx.Response(200, json={"code": "0", "datas": {"xscjcx": {
+                "totalSize": len(rows), "rows": rows[(page - 1) * size: page * size]}}})
+        return httpx.Response(404)
+
+    return httpx.MockTransport(handler)
+
+
+GRADE_ROWS = [
+    {"XH": "2099123456", "XM": "张三", "XNXQDM": "20251", "XNXQDM_DISPLAY": "2025-2026学年 第一学期",
+     "KCMC": "机器学习", "XF": "3", "CJ": "92", "DYBFZCJ": "92", "JDZ": "4.0", "KSXZDM_DISPLAY": "正常考试",
+     "KCLBMC": "学位专业课", "LRRXM": "李四", "BY1": ""},
+    {"XH": "2099123456", "XM": "张三", "XNXQDM": "20251", "XNXQDM_DISPLAY": "2025-2026学年 第一学期",
+     "KCMC": "论文写作", "XF": "1", "CJ": "通过", "DYBFZCJ": "", "JDZ": ""},
+    {"XH": "2099123456", "XM": "张三", "XNXQDM": "20252", "XNXQDM_DISPLAY": "2025-2026学年 第二学期",
+     "KCMC": "自然语言处理", "XF": "3", "CJ": "94", "DYBFZCJ": "94", "JDZ": ""},
+    {"XH": "2099123456", "XM": "张三", "XNXQDM": "20252", "XNXQDM_DISPLAY": "2025-2026学年 第二学期",
+     "KCMC": "深度学习专题", "XF": "2", "CJ": "", "DYBFZCJ": "84", "JDZ": "", "KSXZDM_DISPLAY": "补考"},
+]
+
+
+async def test_grades_request_pagination_and_privacy(tmp_path, monkeypatch):
+    from szu_agent.campus import service
+
+    monkeypatch.setattr(service, "GRADE_PAGE_SIZE", 3)  # 4 行、每页 3 行 → 必须翻到第 2 页
+    seen = []
+    svc = RealCampus(CampusHttp(SessionStore(tmp_path / "s.json"), transport=grade_server(seen, GRADE_ROWS)))
+    data = await svc.grades()
+    assert seen[0][:2] == ("GET", "index.do")  # 先进应用拿 /gsapp/ 的 Cookie
+    posts = [s for s in seen if s[1] == "xscjcx.do"]
+    assert [p[2] for p in posts] == ["pageSize=3&pageNumber=1", "pageSize=3&pageNumber=2"]
+    assert all(p[3] == "XMLHttpRequest" for p in posts)
+    assert data["availableTerms"] == ["2025-2026学年 第二学期", "2025-2026学年 第一学期"]  # 新学期在前
+    dumped = json.dumps(data, ensure_ascii=False)
+    assert not any(x in dumped for x in ("2099123456", "张三", "李四"))  # 学号、姓名、录入人姓名都不取
+    assert data["terms"][1]["courses"][0]["category"] == "学位专业课"
+
+    first_term = data["terms"][1]
+    assert first_term["gpa"] == 4.0 and first_term["weightedScore"] == 92  # “通过”不进平均分和 GPA
+    assert first_term["courses"][1]["score"] == "通过" and first_term["courses"][1]["scorePercent"] is None
+    latest = data["terms"][0]
+    assert latest["gpa"] is None and latest["gradePointMissing"] == 2  # 学校没给绩点：不推算、不给半截 GPA
+    assert latest["courses"][1]["score"] == "84" and latest["courses"][1]["examType"] == "补考"
+    assert data["overall"] == {"courseCount": 4, "credits": 9, "weightedScore": 90.75, "gpa": None, "gradePointMissing": 2}
+
+
+async def test_grades_term_filter(tmp_path):
+    svc = RealCampus(CampusHttp(SessionStore(tmp_path / "s.json"), transport=grade_server([], GRADE_ROWS)))
+    latest = await svc.grades("latest")
+    assert [t["term"] for t in latest["terms"]] == ["2025-2026学年 第二学期"]
+    assert latest["overall"]["courseCount"] == 4  # overall 始终是全部课程
+    for spelled in ("2025-2026学年第一学期", "2025-2026-1", "20251"):  # 学期名（空格随意）、学年-学期、学校代码
+        assert [t["term"] for t in (await svc.grades(spelled))["terms"]] == ["2025-2026学年 第一学期"], spelled
+    missing = await svc.grades("2030")
+    assert missing["terms"] == [] and "availableTerms" in missing["hint"]
+
+
+async def test_grades_non_json_is_page_changed(tmp_path):
+    svc = RealCampus(CampusHttp(SessionStore(tmp_path / "s.json"), transport=grade_server([], [], json_api=False)))
+    with pytest.raises(CampusError) as e:
+        await svc.grades()
+    assert e.value.code == "PAGE_CHANGED" and "研究生" in e.value.message

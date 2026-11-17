@@ -131,6 +131,66 @@ async def check_library(ctrlno: str = "3351727", out=print) -> None:
         await http.aclose()
 
 
+async def check_grades(out=print) -> None:
+    """研究生成绩（szdxwdcjapp）：进应用落在哪、两种请求体的返回、行里有哪些字段、各字段有值的条数。
+
+    不输出课程名、成绩、学分这些值；只输出学期代码 / 学期名 / 考试性质这类和个人无关的取值。
+    """
+    from collections import Counter
+
+    from .campus.debuglog import where
+    from .campus.parsers import build_grade_report, parse_grade_page
+    from .campus.service import GRADE_LIST, GRADE_PAGE
+
+    store = SessionStore()
+    out(f"登录凭证: {'有' if store.info()['hasSession'] else '没有'}")
+    http = CampusHttp(store, cache_ttl=0)
+    try:
+        resp = await http.request("GET", GRADE_PAGE)
+        out(f"[index.do] {resp.status_code} 落在 {where(resp.url)}，跳转 {[where(r.url) for r in resp.history]}")
+        out(f"  /gsapp/ 下的 Cookie: {sorted(c.name for c in http.cookies.jar if (c.path or '').startswith('/gsapp'))}")
+        headers = {"X-Requested-With": "XMLHttpRequest", "Referer": GRADE_PAGE}
+        rows: list[dict[str, Any]] = []
+        for label, body in (("浏览器默认", {"pageSize": "10", "pageNumber": "1"}),
+                            ("爱小荔", {"pageSize": "100", "pageNumber": "1"})):
+            r = await http.request("POST", GRADE_LIST, data=body, headers=headers)
+            ctype = r.headers.get("content-type", "")
+            try:
+                raw = r.json()
+            except ValueError:
+                out(f"[xscjcx.do {label}] {r.status_code} {ctype} 不是 JSON，落在 {where(r.url)}")
+                continue
+            datas = raw.get("datas") if isinstance(raw, dict) else None
+            out(f"[xscjcx.do {label}] {r.status_code} code={raw.get('code') if isinstance(raw, dict) else '-'} "
+                f"顶层 {sorted(raw) if isinstance(raw, dict) else type(raw).__name__} datas {sorted(datas) if isinstance(datas, dict) else '-'}")
+            try:
+                page_rows, total = parse_grade_page(raw)
+            except CampusError as exc:
+                out(f"  ✗ {exc.message}")
+                continue
+            out(f"  totalSize={total}，本页 {len(page_rows)} 行")
+            rows = page_rows or rows
+        if rows:
+            keys = sorted({k for r in rows for k in r})
+            out(f"\n字段（{len(keys)} 个）: {keys}")
+            filled = {k: sum(1 for r in rows if r.get(k) not in (None, "")) for k in
+                      ("KCMC", "XF", "CJ", "DYBFZCJ", "JDZ", "XNXQDM", "XNXQDM_DISPLAY", "KSXZDM_DISPLAY", "KCLBMC")}
+            out(f"有值的行数（共 {len(rows)} 行）: {filled}")
+            for k in ("XNXQDM", "XNXQDM_DISPLAY", "KSXZDM_DISPLAY", "KCLBMC", "SFJG_DISPLAY", "CJFZDM_DISPLAY"):
+                out(f"  {k} 取值: {dict(Counter(str(r.get(k)) for r in rows).most_common(8))}")
+            out(f"  CJ 是不是都是数字: {all(str(r.get('CJ') or '0').replace('.', '', 1).isdigit() for r in rows)}")
+            rep = build_grade_report(rows)
+            out(f"解析结果: {len(rep['terms'])} 个学期，overall 有学分 {rep['overall']['credits'] > 0}，"
+                f"有加权平均 {rep['overall']['weightedScore'] is not None}，缺绩点 {rep['overall']['gradePointMissing']} 门")
+        out("\n自检完成（只读；上面没有课程名和成绩）")
+    except CampusError as exc:
+        out(f"\n✗ {exc.code}: {exc.message}")
+        if exc.code in ("LOGIN_REQUIRED", "MFA_REQUIRED"):
+            out("  先在爱小荔界面上登录 / 完成二次验证，再运行一次")
+    finally:
+        await http.aclose()
+
+
 async def check_booth(out=print) -> None:
     """网络面试间（事务中心 venue-api）：登录跳转链 + 列表 + 时段 + 资格 + 我的预约。全程只读，不提交预约。
 

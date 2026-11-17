@@ -21,7 +21,7 @@ import httpx
 from .cas import QrState
 from .errors import CampusError
 from .parsers import (
-    build_courses, courses_on, lecture_progress, normalize_lecture, notice_stats,
+    build_courses, build_grade_report, courses_on, parse_grade_page, lecture_progress, normalize_lecture, notice_stats,
     parse_library_book, parse_library_search, parse_notice_detail, parse_notice_list, parse_prebook_form,
 )
 from .contact import ContactStore
@@ -325,6 +325,12 @@ class MockCampus:
     async def course_today(self, day: date | None = None) -> dict[str, Any]:
         self._require_login()
         return courses_on(build_courses(json.loads(_read("course-api.json"))), day or date.today())
+
+    async def grades(self, term: str | None = None) -> dict[str, Any]:
+        """演示：研一两个学期的成绩（假数据，字段和真实接口一致）。"""
+        self._require_login()
+        rows, _ = parse_grade_page(json.loads(_read("grades.json")))
+        return {**build_grade_report(rows, term), "url": "https://ehall.szu.edu.cn/gsapp/sys/szdxwdcjapp/*default/index.do"}
 
     # 体育预约
     async def sports_campuses(self) -> dict[str, Any]:
