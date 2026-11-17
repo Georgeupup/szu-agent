@@ -418,7 +418,11 @@ def create_app(*, mock: bool | None = None, llm: BaseChatModel | None = None, pr
     async def revalidate_static(request, call_next):
         resp = await call_next(request)
         if request.url.path.startswith("/static/"):
-            resp.headers["Cache-Control"] = "no-cache"  # 可以缓存，但每次先向服务器确认有没有更新
+            if request.query_params.get("v"):
+                # 带内容哈希的地址：内容变了地址就变，可以放心长期缓存（省掉每次打开页面的跨境确认往返）
+                resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+            else:
+                resp.headers["Cache-Control"] = "no-cache"  # 可以缓存，但每次先向服务器确认有没有更新
         return resp
 
     @app.get("/api/meta")

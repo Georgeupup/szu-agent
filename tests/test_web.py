@@ -1,6 +1,7 @@
 """Web 接口测试：SSE 事件序列、确认中断与恢复、历史恢复、记忆接口。"""
 
 import json
+import re
 
 from fastapi.testclient import TestClient
 from langchain_core.messages import AIMessage
@@ -298,3 +299,12 @@ def test_demo_meta_links_to_real_service(home, monkeypatch):
     with TestClient(create_app(mock=True, llm=ScriptedChatModel(script=[]), profile=ProfileStore(home / "p.json"))) as client:
         assert client.get("/api/meta").json()["realUrl"] == "https://example.test"
         assert 'id="demoBanner"' in client.get("/").text
+
+
+def test_versioned_static_cached_long(home):
+    # 首页给脚本加内容哈希：带哈希的地址可以长期缓存，不带的每次确认
+    with TestClient(create_app(mock=True, llm=ScriptedChatModel(script=[]), profile=ProfileStore(home / "p.json"))) as client:
+        html = client.get("/").text
+        url = re.search(r'/static/app\.js\?v=[0-9a-f]+', html).group(0)
+        assert "immutable" in client.get(url).headers["cache-control"]
+        assert client.get("/static/app.js").headers["cache-control"] == "no-cache"
