@@ -822,11 +822,13 @@ def create_server(campus: Any = None) -> FastMCP:
         用于“我还有什么作业没交”“这周有哪些 ddl”“计算机网络实验 2 多少分”“作业出分了吗”。
         pending 是所有待交 / 可补交的作业，按截止时间排好，hoursLeft 是剩余小时数；status：已交 / 待交 / 未开始 / 可补交 / 已截止未交。
         score 为 null 就是还没评分，不要猜分数。这是平时作业的分数，课程总评 / 期末成绩不在畅课里。
-        role=teaching 的课是用户当老师或助教的课，不算他的作业。"""
+        role=teaching 的课是用户当老师或助教的课：不算他的作业，homework 里是全班提交 / 未交 / 已批改人数（点名查这门课时才有）。
+        有 note 时（比如这学期没有以学生身份上的课）照 note 说明。"""
         res = await call(svc.lms_homework(course, term, pending_only))
         if res["ok"]:
             for g in res["data"]["courses"]:
-                g["homework"] = [{k: v for k, v in h.items() if v not in (None, [], False) and k not in ("id", "submitCount")}
+                # 注意 0 == False：人数为 0 要留着，所以用 is 判断
+                g["homework"] = [{k: v for k, v in h.items() if v is not None and v != [] and v is not False and k not in ("id", "submitCount")}
                                  for h in g.get("homework", [])]
                 if not g["homework"]:
                     g.pop("homework")

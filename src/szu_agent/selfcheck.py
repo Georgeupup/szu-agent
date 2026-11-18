@@ -472,16 +472,24 @@ async def check_lms(out=print) -> None:
                 out(f"  字段: {_keys(rows)}")
         report = await lms.courses_report(lambda: lms.fetch_courses(http), None, lms.datetime.now(lms.CST).date())
         out(f"\n当前学期判断: {report['term']}（{len(report['courses'])} 门），可选学期 {report['availableTerms']}")
-        student = [c for c in report["courses"] if c["role"] == "student"] or [lms.normalize_course(c) for c in courses][:1]
-        if student:
-            rows = await lms.fetch_homework(http, student[0]["id"])
-            out(f"[homework-activities 第 1 门学生身份的课] {len(rows)} 条作业")
-            if rows:
-                out(f"  字段: {_keys(rows)}")
-                out(f"  submitted: {dict(Counter(bool(r.get('submitted')) for r in rows))}，score 有值: "
-                    f"{sum(1 for r in rows if r.get('score') not in (None, ''))}，有 deadline: {sum(1 for r in rows if r.get('deadline'))}")
-                now = lms.datetime.now(lms.CST).replace(tzinfo=None)
-                out(f"  解析后的状态: {dict(Counter(lms.normalize_homework(r, now)['status'] for r in rows))}")
+        # 学生身份、学期最新的一门课，和当老师 / 助教的一门课，各查一次作业列表（两种视角字段不同）
+        norm = sorted((lms.normalize_course(c) for c in courses), key=lambda c: c["termKey"] or "", reverse=True)
+        now = lms.datetime.now(lms.CST).replace(tzinfo=None)
+        for role, label in (("student", "学生身份"), ("teaching", "老师/助教身份")):
+            pick = next((c for c in norm if c["role"] == role), None)
+            if not pick:
+                out(f"[homework-activities {label}] 没有这种课")
+                continue
+            rows = await lms.fetch_homework(http, pick["id"])
+            out(f"[homework-activities {label}，{pick['term']}] {len(rows)} 条作业")
+            if not rows:
+                continue
+            out(f"  字段: {_keys(rows)}")
+            out(f"  submitted: {dict(Counter(r.get('submitted') for r in rows))}，score 有值: "
+                f"{sum(1 for r in rows if r.get('score') not in (None, ''))}，有 deadline: {sum(1 for r in rows if r.get('deadline'))}，"
+                f"有 end_time: {sum(1 for r in rows if r.get('end_time'))}")
+            fn = lms.normalize_homework if role == "student" else lms.normalize_teaching_homework
+            out(f"  解析后的状态: {dict(Counter(fn(r, now)['status'] for r in rows))}")
         out("\n自检完成（只读；上面没有课程名、作业名和分数）")
     except CampusError as exc:
         out(f"\n✗ {exc.code}: {exc.message}")

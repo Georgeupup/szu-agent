@@ -161,4 +161,6 @@ async def test_lms_homework_tool_trims_output(logged_in):
         courses = (await client("lms_courses"))["data"]["courses"]
         assert {c["name"] for c in courses} == {"计算机网络", "机器学习导论", "大学计算机"}
         assert next(c for c in courses if c["name"] == "大学计算机")["role"] == "teaching"
+        ta = (await client("lms_homework", course="大学计算机"))["data"]["courses"][0]
+        assert ta["role"] == "teaching" and ta["homework"][0]["scoredCount"] == 0  # 人数 0 不能被当成 False 裁掉
         assert "张三" not in str(res) + str(courses)

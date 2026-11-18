@@ -259,20 +259,26 @@
     "title": "实验3",
     "type": "homework",
     "published": true,
-    "deadline": "2026-11-23T15:59:00Z",
     "end_time": "2026-11-23T15:59:00Z",
     "start_time": null,
-    "submitted": false,
-    "score": null,
     "is_closed": false,
-    "can_make_up_homework": false,
-    "user_submit_count": 0,
-    "submit_by_group": false,
-    "data": {
-     "description": "",
-     "homework_type": "file_upload"
-    },
-    "uploads": []
+    "submitted_count": 73,
+    "unsubmitted_count": 92,
+    "scored_count": 0,
+    "expected_submit_count": 165
+   },
+   {
+    "id": 20,
+    "title": "实验2",
+    "type": "homework",
+    "published": true,
+    "end_time": "2026-11-02T15:59:00Z",
+    "start_time": null,
+    "is_closed": true,
+    "submitted_count": 157,
+    "unsubmitted_count": 8,
+    "scored_count": 157,
+    "expected_submit_count": 165
    }
   ],
   "80101": [

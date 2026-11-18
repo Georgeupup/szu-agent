@@ -58,7 +58,12 @@ HOMEWORK = {
           homework(12, "实验2", "2026-11-09T15:59:00Z", submitted=False, closed=True, makeup=True),
           homework(13, "实验3", "2026-11-20T15:59:00Z", submitted=False),
           homework(14, "实验4", "2026-12-01T15:59:00Z", submitted=False, start="2026-11-24T00:00:00Z")],
-    502: [homework(21, "实验3", "2026-11-23T15:59:00Z", submitted=False)],
+    # 老师 / 助教视角（2026-11-18 真实账号自检）：没有 submitted / score / deadline，只有全班人数
+    502: [{"id": 21, "title": "实验3", "type": "homework", "published": True, "end_time": "2026-11-23T15:59:00Z",
+           "start_time": None, "is_closed": False, "submitted_count": 73, "unsubmitted_count": 92, "scored_count": 0,
+           "expected_submit_count": 165, "uploads": []},
+          {"id": 20, "title": "实验2", "type": "homework", "published": True, "end_time": "2026-11-02T15:59:00Z",
+           "start_time": None, "is_closed": True, "submitted_count": 157, "unsubmitted_count": 8, "scored_count": 157}],
 }
 
 
@@ -154,8 +159,24 @@ async def test_course_lookup_scores_and_privacy(tmp_path, at_nov18):
     teaching = next(c for c in courses["courses"] if c["name"] == "大学计算机")
     assert teaching["role"] == "teaching" and teaching["url"] == "https://lms.szu.edu.cn/course/502/index"
 
-    # 点名要查当老师 / 助教的课也能查，但标出 role
-    assert (await svc.lms_homework(course="大学计算机"))["courses"][0]["role"] == "teaching"
+    # 点名要查当老师 / 助教的课：给全班人数，不套“交没交”，也不算进 counts / pending
+    ta = await svc.lms_homework(course="大学计算机")
+    group = ta["courses"][0]
+    assert group["role"] == "teaching" and ta["pending"] == [] and ta["counts"]["total"] == 0
+    assert group["homework"] == [
+        {"id": 21, "title": "实验3", "status": "进行中", "deadline": "2026-11-23 23:59",
+         "submittedCount": 73, "unsubmittedCount": 92, "scoredCount": 0},
+        {"id": 20, "title": "实验2", "status": "已截止", "deadline": "2026-11-02 23:59",
+         "submittedCount": 157, "unsubmittedCount": 8, "scoredCount": 157}]
+
+
+async def test_term_with_only_teaching_courses_says_so(tmp_path, at_nov18, monkeypatch):
+    # 2026-11-18 真实账号：这学期畅课上只有一门当助教的课
+    monkeypatch.setattr(lms, "normalize_course", lambda c, _orig=lms.normalize_course: {
+        **_orig(c), "role": "teaching" if c["id"] in (501, 502) else "student"})
+    data = await real(tmp_path, []).lms_homework(pending_only=True)
+    assert data["courses"] == [] and data["pending"] == []
+    assert "没有你以学生身份上的课" in data["note"] and "计算机网络、大学计算机" in data["note"]
 
 
 async def test_term_selection(tmp_path, at_nov18):

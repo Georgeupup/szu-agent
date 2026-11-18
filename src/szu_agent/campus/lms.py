@@ -168,6 +168,7 @@ def _text(html: str | None, limit: int = 150) -> str | None:
 
 
 def normalize_homework(a: dict[str, Any], now: datetime) -> dict[str, Any]:
+    """学生视角：交没交、分数。字段来自 2026-11-18 抓包（学生身份的课：submitted / score / deadline 都有）。"""
     deadline = to_beijing(a.get("deadline") or a.get("end_time"))
     start = to_beijing(a.get("start_time"))
     submitted = bool(a.get("submitted"))
@@ -194,6 +195,33 @@ def normalize_homework(a: dict[str, Any], now: datetime) -> dict[str, Any]:
         "note": _text(data.get("description")),
         "attachments": [str(u.get("name")) for u in a.get("uploads") or [] if isinstance(u, dict) and u.get("name")],
         "_deadline": deadline,
+    }
+
+
+def normalize_teaching_homework(a: dict[str, Any], now: datetime) -> dict[str, Any]:
+    """老师 / 助教视角（is_instructor=true 的课）：接口不给 submitted / score / deadline，
+    给的是全班的 submitted_count / unsubmitted_count / scored_count（2026-11-18 真实账号自检看到的字段）。
+    只有人数，没有学生名单。"""
+    end = to_beijing(a.get("deadline") or a.get("end_time"))
+    start = to_beijing(a.get("start_time"))
+    if start and start > now:
+        status = "未开始"
+    elif a.get("is_closed") or (end is not None and end < now):
+        status = "已截止"
+    else:
+        status = "进行中"
+
+    def count(key: str) -> int | None:
+        v = a.get(key)
+        return v if isinstance(v, int) else None
+    return {
+        "id": a.get("id"),
+        "title": str(a.get("title") or "").strip(),
+        "status": status,
+        "deadline": end.strftime("%Y-%m-%d %H:%M") if end else None,
+        "submittedCount": count("submitted_count"),
+        "unsubmittedCount": count("unsubmitted_count"),
+        "scoredCount": count("scored_count"),
     }
 
 
@@ -262,7 +290,12 @@ def build_homework_report(picked: list[dict[str, Any]], homework: dict[Any, list
     groups, pending = [], []
     counts = {"total": 0, "submitted": 0, "pending": 0, "missed": 0, "unscored": 0}
     for c in picked:
-        items = [normalize_homework(a, now) for a in homework.get(c["id"], []) if a.get("published", True)]
+        rows = [a for a in homework.get(c["id"], []) if a.get("published", True)]
+        if c["role"] == "teaching":  # 用户当老师 / 助教的课：只给全班人数，不算进“我的作业”
+            groups.append({"course": c["name"], "term": c["term"], "url": f"{LMS}/course/{c['id']}/homework", "role": "teaching",
+                           **({} if pending_only else {"homework": [normalize_teaching_homework(a, now) for a in rows]})})
+            continue
+        items = [normalize_homework(a, now) for a in rows]
         for h in items:
             counts["total"] += 1
             counts["submitted"] += h["status"] == "已交"
@@ -275,8 +308,6 @@ def build_homework_report(picked: list[dict[str, Any]], homework: dict[Any, list
                                 "hoursLeft": round(left.total_seconds() / 3600, 1) if left and left.total_seconds() > 0 else None,
                                 "note": h["note"], "_deadline": h["_deadline"]})
         group: dict[str, Any] = {"course": c["name"], "term": c["term"], "url": f"{LMS}/course/{c['id']}/homework"}
-        if c["role"] == "teaching":
-            group["role"] = "teaching"
         if not pending_only:
             group["homework"] = [{k: v for k, v in h.items() if not k.startswith("_")} for h in items]
         groups.append(group)
@@ -311,7 +342,12 @@ async def homework_report(load_courses, load_homework, *, course: str | None, te
         meta["term"] = picked[0]["term"]
     else:
         picked, meta = pick_term(courses, term, now.date())
+        teaching = [c["name"] for c in picked if c["role"] == "teaching"]
         picked = [c for c in picked if c["role"] == "student"]
+        if not picked and meta.get("term"):
+            # 2026-11-18 真实账号：研究生这学期畅课上只有一门当助教的课
+            meta["note"] = (f"{meta['term']}畅课上没有你以学生身份上的课"
+                            + (f"（{'、'.join(teaching)} 是你当老师或助教的课，可以点名查全班提交情况）" if teaching else ""))
     lists = await asyncio.gather(*(load_homework(c["id"]) for c in picked))
     report = build_homework_report(picked, {c["id"]: rows for c, rows in zip(picked, lists)}, now, pending_only=pending_only)
     return {**meta, **report, "url": LMS_HOME}
