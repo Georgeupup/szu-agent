@@ -935,7 +935,7 @@ async function openThread(id) {
 // ---------------- 登录 ----------------
 // 密码只通过 /api/auth/password 发给本机后端，再由后端发给深大统一认证；不会进入对话，也不会发给 AI 模型。
 let auth = { loggedIn: false };
-let quota = null;     // 每日额度（多人模式默认每人每天 ¥0.5）；没开就是 null
+let quota = null;     // 每日额度（多人模式默认每人每天 ¥1）；没开就是 null
 let demoMode = false, realUrl = "";  // 演示站：数据是假的、不连接学校，登录卡片不出现账号密码输入框
 let multiuser = false; // 部署到服务器给多人用：先用学校统一认证登录爱小荔，每个人的记忆和历史分开
 let activeLogin = null; // 同一时间只保留一张可用的登录卡片

@@ -347,11 +347,11 @@ def create_app(*, mock: bool | None = None, llm: BaseChatModel | None = None, pr
         return uid
 
     # ------------------------------ 每日额度 ------------------------------ #
-    # 每人每天能花多少元的模型费用（北京时间 0 点清零）。多人模式默认 0.5 元，单人模式默认不限；
+    # 每人每天能花多少元的模型费用（北京时间 0 点清零）。多人模式默认 1 元，单人模式默认不限；
     # SZU_AGENT_DAILY_QUOTA_CNY 可改，0 表示不限。花费按 usage.sqlite 里写入时算好的金额累计（含压缩历史）。
     # 只拦新消息、不拦“确认”：预览完正要确认时额度刚好用完，不能把用户卡在确认卡片上。
     # 一轮对话里可能连续调用好几次模型，所以实际花费会略超额度（通常几分钱以内）。
-    quota_cny = float(os.environ.get("SZU_AGENT_DAILY_QUOTA_CNY") or (0.5 if multi else 0))
+    quota_cny = float(os.environ.get("SZU_AGENT_DAILY_QUOTA_CNY") or (1.0 if multi else 0))
 
     def quota_of(user_id: str) -> dict[str, Any]:
         from ..agent.usage import beijing_day_start
