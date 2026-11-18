@@ -149,3 +149,14 @@ def test_make_llm_passes_enable_thinking_only_when_configured(monkeypatch):
     assert not make_llm().extra_body  # DeepSeek 官方接口不认这个参数：不设就不传
     monkeypatch.setenv("LLM_ENABLE_THINKING", "0")
     assert make_llm().extra_body == {"enable_thinking": False}
+
+
+def test_bailian_deepseek_busy_hours_are_every_day_8_to_22():
+    from szu_agent.agent.pricing import peak_applies
+    sunday_noon = datetime(2026, 11, 15, 12, 0, tzinfo=CST)  # 周日也算忙时（和 DeepSeek 官方不同）
+    night = datetime(2026, 11, 16, 22, 30, tzinfo=CST)
+    assert peak_applies("deepseek-v4.1-flash", sunday_noon) and not peak_applies("deepseek-flash", sunday_noon)
+    assert not peak_applies("deepseek-v4.1-flash", night)
+    # 闲时：输入 1、命中 2% = 0.02、输出 4；忙时 ×2
+    assert abs(cost_cny("deepseek-v4.1-flash", cache_hit=1_000_000, cache_miss=1_000_000, output=1_000_000, at=night) - 5.02) < 1e-9
+    assert abs(cost_cny("deepseek-v4.1-flash-1017", cache_hit=0, cache_miss=1_000_000, output=0, at=sunday_noon) - 2.0) < 1e-9

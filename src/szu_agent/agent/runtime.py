@@ -22,14 +22,15 @@ from .usage import UsageStore
 
 
 def make_llm() -> BaseChatModel:
-    """任何 OpenAI 兼容接口：阿里云百炼（千问）、DeepSeek、Kimi、智谱……只需改 .env。"""
+    """任何 OpenAI 兼容接口：阿里云百炼、DeepSeek、Kimi、智谱……只需改 .env。"""
     from langchain_openai import ChatOpenAI
 
     api_key = os.environ.get("LLM_API_KEY")
     if not api_key:
         raise SystemExit("缺少 LLM_API_KEY，请复制 .env.example 为 .env 并填写。")
-    # 千问 3.x（阿里云百炼）默认开思考：一次工具调用多 1-3 秒；而且思考模式下多轮工具调用要求回传
-    # reasoning_content，langchain-openai 不回传。所以百炼上设 LLM_ENABLE_THINKING=0。
+    # 百炼上的 deepseek-v4.1-flash、千问 3.x 默认开思考：每次调用多 1-2 秒（2026-11-17 实测）；
+    # 有些模型（如 qwen4-max）思考模式下多轮工具调用还要求回传 reasoning_content，langchain-openai 不回传。
+    # 所以百炼上设 LLM_ENABLE_THINKING=0。
     # 不设就不传这个参数（DeepSeek 官方接口不认它）。
     thinking = os.environ.get("LLM_ENABLE_THINKING", "").strip()
     extra = {"enable_thinking": thinking not in ("0", "false", "off")} if thinking else None

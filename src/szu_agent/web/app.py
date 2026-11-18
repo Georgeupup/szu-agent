@@ -556,9 +556,8 @@ def create_app(*, mock: bool | None = None, llm: BaseChatModel | None = None, pr
         report["quota"] = {"limitCny": quota_cny} if quota_cny > 0 else None
         model = os.environ.get("LLM_MODEL", "deepseek-chat")
         price, src = pricing.price_for(model), pricing.source_for(model)
-        note = ("按官方价格估算；工作日 9-12、14-18 点（北京时间）是高峰价，法定节假日实际按空闲价，这里会略微高估。"
-                "以 DeepSeek 后台账单为准。") if price and price.peak else \
-               "按官方原价估算（隐式缓存命中按输入价 20%），不含限时折扣，以平台账单为准。"
+        note = "按官方原价估算，不含限时折扣和免费额度，以平台账单为准。" + \
+            (pricing.PEAK_NOTES[price.peak] if price and price.peak else "")
         report["pricing"] = {"model": model, "priced": price is not None, "source": src.url,
                              "sourceName": src.name, "verifiedAt": src.verified_at, "note": note}
         return report
