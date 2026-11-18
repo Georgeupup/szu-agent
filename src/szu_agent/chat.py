@@ -10,6 +10,7 @@
     szu-agent check booth       # 只读自检：事务中心静音舱的登录跳转、列表、时段、资格
     szu-agent check courses     # 只读自检：研究生课表接口（字段名、周次节次取值，不输出课程名老师教室）
     szu-agent check grades      # 只读自检：研究生成绩接口的字段名和计数（不输出成绩本身）
+    szu-agent check lms         # 只读自检：畅课登录跳转、课程学期分布、作业字段（不输出课程名和分数）
     szu-agent check webvpn      # 交互式诊断：终端里完成 WebVPN 登录 + 二次验证（失败时自动试 skipTmpReAuth=false）
     szu-agent usage [--days 7]  # 模型用量：token、缓存命中率、估算花费（网页版在 /usage）
     szu-agent log [正则]        # 打印诊断日志里最近的相关行（默认：二次验证和事务中心）
@@ -244,7 +245,7 @@ def main() -> None:
     p_login.add_argument("--password", action="store_true", help="用账号密码登录（默认扫码）")
     p_login.add_argument("--mock", action="store_true")
     p_check = sub.add_parser("check", help="用本机登录凭证对学校接口做只读自检，输出不含个人信息")
-    p_check.add_argument("target", choices=["sports", "library", "booth", "webvpn", "grades", "courses"])
+    p_check.add_argument("target", choices=["sports", "library", "booth", "webvpn", "grades", "courses", "lms"])
     p_check.add_argument("ctrlno", nargs="?", default="3351727", help="library：书目编号（默认《想念地坛》）")
     p_log = sub.add_parser("log", help="打印诊断日志里最近的相关行（只有地址、状态码、结果码，可以直接贴出来）")
     p_log.add_argument("pattern", nargs="?", default="mfa|swzx|webvpn|authserver-443", help="正则，默认看二次验证和事务中心")
@@ -268,7 +269,7 @@ def main() -> None:
     if args.cmd == "login":
         asyncio.run(login(args.mock, args.password))
     elif args.cmd == "check":
-        from .selfcheck import check_booth, check_courses, check_grades, check_library, check_sports, check_webvpn
+        from .selfcheck import check_booth, check_courses, check_grades, check_library, check_lms, check_sports, check_webvpn
 
         # markup=False：输出里的 [bookinfo.aspx] 这类方括号会被 rich 当成样式标签吞掉
         def plain(text: str) -> None:
@@ -284,6 +285,8 @@ def main() -> None:
             asyncio.run(check_grades(plain))
         elif args.target == "courses":
             asyncio.run(check_courses(plain))
+        elif args.target == "lms":
+            asyncio.run(check_lms(plain))
         else:
             asyncio.run(check_sports(plain))
     elif args.cmd == "log":

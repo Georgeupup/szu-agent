@@ -14,7 +14,7 @@ const TOOL_LABELS = {
   sports_reserve_preview: "生成预约预览", sports_reserve_confirm: "提交预约",
   sports_cancel_preview: "预览取消", sports_cancel_confirm: "取消预约", sports_balance: "查体育经费",
   electricity_buildings: "查看宿舍楼", electricity_query: "查询电费", electricity_purchases: "查询充值记录",
-  course_today: "查询课表", course_schedule: "查看学期课表", grades_query: "查询成绩", library_search: "搜索馆藏", remember_user_info: "记住偏好",
+  course_today: "查询课表", course_schedule: "查看学期课表", grades_query: "查询成绩", lms_homework: "查询畅课作业", lms_courses: "查看畅课课程", library_search: "搜索馆藏", remember_user_info: "记住偏好",
   notice_read_many: "阅读公告正文", show_notice_board: "整理成通知面板",
   weather_today: "查询天气", electricity_purchases: "查询充值记录", show_recharge_card: "电费充值",
   library_book: "查看馆藏位置", library_prebook_preview: "生成预借预览", library_prebook_confirm: "提交预借",

@@ -426,3 +426,66 @@ async def check_webvpn(out=print) -> None:
         out(f"\n✗ {exc.code}: {exc.message}")
     finally:
         await (mfa.aclose() if mfa else cas.aclose())
+
+
+async def check_lms(out=print) -> None:
+    """畅课：单点登录跳转链（lms → identity → authserver）、my-courses 不带学期编号时返回哪些学期、作业列表字段。
+
+    不输出课程名、作业名、分数；只输出学期名、计数和字段名。
+    """
+    from collections import Counter
+
+    from .campus import lms
+    from .campus.debuglog import where
+
+    store = SessionStore()
+    out(f"登录凭证: {'有' if store.info()['hasSession'] else '没有'}")
+    http = CampusHttp(store, cache_ttl=0)
+    try:
+        resp = await http.request("GET", lms.LMS_HOME)
+        out(f"[进入畅课] {resp.status_code} 落在 {where(resp.url)}")
+        out(f"  跳转 {[where(r.url) for r in resp.history]}")
+        out(f"  lms 的 Cookie: {sorted(c.name for c in http.cookies.jar if 'lms.szu.edu.cn' in (c.domain or ''))}")
+        if resp.url.host != "lms.szu.edu.cn":
+            out("  ✗ 没有跳回畅课，后面的检查跳过")
+            return
+        variants = (("爱小荔（不带学期编号）", lms.COURSE_CONDITIONS),
+                    ("学期编号为空数组", {**lms.COURSE_CONDITIONS, "academic_year_id": [], "semester_id": []}),
+                    ("不带 classify_type", {k: v for k, v in lms.COURSE_CONDITIONS.items() if k != "classify_type"}))
+        courses: list[dict[str, Any]] = []
+        for label, cond in variants:
+            try:
+                body = await lms.api(http, "POST", "/api/my-courses", json={
+                    "page": 1, "page_size": lms.COURSE_PAGE_SIZE, "fields": lms.COURSE_FIELDS, "conditions": cond})
+            except CampusError as exc:
+                out(f"[my-courses {label}] ✗ {exc.code}: {exc.message}")
+                continue
+            rows = body.get("courses") if isinstance(body, dict) else None
+            if not isinstance(rows, list):
+                out(f"[my-courses {label}] 结构不对：顶层 {sorted(body) if isinstance(body, dict) else type(body).__name__}")
+                continue
+            sems = Counter(str((r.get("semester") or {}).get("name")) for r in rows if isinstance(r, dict))
+            out(f"[my-courses {label}] total={body.get('total')} pages={body.get('pages')} 本页 {len(rows)} 门；学期: {dict(sems)}")
+            out(f"  is_instructor: {dict(Counter(bool(r.get('is_instructor')) for r in rows))}")
+            if not courses and rows:
+                courses = rows
+                out(f"  字段: {_keys(rows)}")
+        report = await lms.courses_report(lambda: lms.fetch_courses(http), None, lms.datetime.now(lms.CST).date())
+        out(f"\n当前学期判断: {report['term']}（{len(report['courses'])} 门），可选学期 {report['availableTerms']}")
+        student = [c for c in report["courses"] if c["role"] == "student"] or [lms.normalize_course(c) for c in courses][:1]
+        if student:
+            rows = await lms.fetch_homework(http, student[0]["id"])
+            out(f"[homework-activities 第 1 门学生身份的课] {len(rows)} 条作业")
+            if rows:
+                out(f"  字段: {_keys(rows)}")
+                out(f"  submitted: {dict(Counter(bool(r.get('submitted')) for r in rows))}，score 有值: "
+                    f"{sum(1 for r in rows if r.get('score') not in (None, ''))}，有 deadline: {sum(1 for r in rows if r.get('deadline'))}")
+                now = lms.datetime.now(lms.CST).replace(tzinfo=None)
+                out(f"  解析后的状态: {dict(Counter(lms.normalize_homework(r, now)['status'] for r in rows))}")
+        out("\n自检完成（只读；上面没有课程名、作业名和分数）")
+    except CampusError as exc:
+        out(f"\n✗ {exc.code}: {exc.message}")
+        if exc.code in ("LOGIN_REQUIRED", "MFA_REQUIRED"):
+            out("  先在爱小荔界面上登录 / 完成二次验证，再运行一次")
+    finally:
+        await http.aclose()

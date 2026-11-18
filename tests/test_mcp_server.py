@@ -147,3 +147,18 @@ async def test_notice_search_filters_and_read_many(logged_in):
         first = many["data"]["notices"][0]
         assert "2026年11月20日前" in first["content"] and "2020123456" not in first["content"]
         assert first["attachments"] == ["国家奖学金申请审批表.docx"]
+
+
+async def test_lms_homework_tool_trims_output(logged_in):
+    async with mcp_client(logged_in) as client:
+        res = await client("lms_homework", course="计算机网络")
+        hw = res["data"]["courses"][0]["homework"]
+        assert all("id" not in h and "submitCount" not in h and "groupWork" not in h for h in hw)  # 没用的字段裁掉
+        assert any(h.get("score") == "92" for h in hw)
+        assert all(None not in h.values() for h in hw)
+        pending = (await client("lms_homework", pending_only=True))["data"]
+        assert pending["pending"] and all("homework" not in g for g in pending["courses"])
+        courses = (await client("lms_courses"))["data"]["courses"]
+        assert {c["name"] for c in courses} == {"计算机网络", "机器学习导论", "大学计算机"}
+        assert next(c for c in courses if c["name"] == "大学计算机")["role"] == "teaching"
+        assert "张三" not in str(res) + str(courses)

@@ -28,7 +28,8 @@ from .contact import ContactStore
 from .session import SessionStore
 
 FIXTURES = Path(__file__).parent.parent / "mock_fixtures"
-SPORTS_FIXTURE_TODAY = date(2026, 11, 14)  # sports.json 录制时的“今天”（开放日期 11-14、11-15）
+SPORTS_FIXTURE_TODAY = date(2026, 11, 14)
+LMS_FIXTURE_TODAY = date(2026, 11, 18)  # lms.json 里的截止时间以这天为“今天”编写  # sports.json 录制时的“今天”（开放日期 11-14、11-15）
 
 
 def mock_today() -> date:
@@ -342,6 +343,39 @@ class MockCampus:
         self._require_login()
         rows, _ = parse_grade_page(json.loads(_read("grades.json")))
         return {**build_grade_report(rows, term), "url": "https://ehall.szu.edu.cn/gsapp/sys/szdxwdcjapp/*default/index.do"}
+
+    # 畅课（假数据，结构照 2026-11-18 抓包；截止时间随“今天”平移，演示时一直有待交作业）
+    def _lms_data(self) -> dict[str, Any]:
+        days = (mock_today() - LMS_FIXTURE_TODAY).days
+        text = re.sub(r"\b20\d\d-\d\d-\d\d(?=T|\")",
+                      lambda m: (date.fromisoformat(m.group(0)) + timedelta(days=days)).isoformat(), _read("lms.json"))
+        return json.loads(text)
+
+    async def lms_courses(self, term: str | None = None) -> dict[str, Any]:
+        from . import lms
+
+        self._require_login()
+        data = self._lms_data()
+
+        async def load() -> list[dict[str, Any]]:
+            return data["courses"]
+        return await lms.courses_report(load, term, mock_today())
+
+    async def lms_homework(self, course: str | None = None, term: str | None = None,
+                           pending_only: bool = False) -> dict[str, Any]:
+        from . import lms
+        from .booth import beijing_now
+
+        self._require_login()
+        data = self._lms_data()
+
+        async def load() -> list[dict[str, Any]]:
+            return data["courses"]
+
+        async def load_hw(cid: int) -> list[dict[str, Any]]:
+            return data["homework"].get(str(cid), [])
+        now = datetime.combine(mock_today(), beijing_now().time())
+        return await lms.homework_report(load, load_hw, course=course, term=term, pending_only=pending_only, now=now)
 
     # 体育预约
     async def sports_campuses(self) -> dict[str, Any]:

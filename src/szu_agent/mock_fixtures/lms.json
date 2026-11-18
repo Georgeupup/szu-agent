@@ -1,0 +1,328 @@
+{
+ "courses": [
+  {
+   "id": 90101,
+   "name": "计算机网络",
+   "course_code": "20262027113008600091",
+   "is_instructor": false,
+   "compulsory": true,
+   "instructors": [
+    {
+     "id": 9001,
+     "name": "李明",
+     "avatar_big_url": ""
+    }
+   ],
+   "instructor_assistants": [],
+   "assistants": [],
+   "department": {
+    "id": 56,
+    "name": "计算机与软件学院"
+   },
+   "credit": null,
+   "start_date": "2026-08-31",
+   "semester": {
+    "id": 9,
+    "name": "2026-2027第一学期"
+   },
+   "url": "https://lms.szu.edu.cn:443/course/90101/index"
+  },
+  {
+   "id": 90102,
+   "name": "机器学习导论",
+   "course_code": "20262027113008600092",
+   "is_instructor": false,
+   "compulsory": true,
+   "instructors": [
+    {
+     "id": 9002,
+     "name": "王芳",
+     "avatar_big_url": ""
+    }
+   ],
+   "instructor_assistants": [],
+   "assistants": [],
+   "department": {
+    "id": 56,
+    "name": "计算机与软件学院"
+   },
+   "credit": null,
+   "start_date": "2026-08-31",
+   "semester": {
+    "id": 9,
+    "name": "2026-2027第一学期"
+   },
+   "url": "https://lms.szu.edu.cn:443/course/90102/index"
+  },
+  {
+   "id": 90103,
+   "name": "大学计算机",
+   "course_code": "20262027113008600093",
+   "is_instructor": true,
+   "compulsory": true,
+   "instructors": [
+    {
+     "id": 9003,
+     "name": "赵强",
+     "avatar_big_url": ""
+    }
+   ],
+   "instructor_assistants": [
+    {
+     "id": 1,
+     "name": "张三"
+    }
+   ],
+   "assistants": [],
+   "department": {
+    "id": 56,
+    "name": "计算机与软件学院"
+   },
+   "credit": null,
+   "start_date": "2026-08-31",
+   "semester": {
+    "id": 9,
+    "name": "2026-2027第一学期"
+   },
+   "url": "https://lms.szu.edu.cn:443/course/90103/index"
+  },
+  {
+   "id": 80101,
+   "name": "无线网络技术",
+   "course_code": "20262027113008600091",
+   "is_instructor": false,
+   "compulsory": true,
+   "instructors": [
+    {
+     "id": 9001,
+     "name": "李明",
+     "avatar_big_url": ""
+    }
+   ],
+   "instructor_assistants": [],
+   "assistants": [],
+   "department": {
+    "id": 56,
+    "name": "计算机与软件学院"
+   },
+   "credit": null,
+   "start_date": "2025-09-01",
+   "semester": {
+    "id": 7,
+    "name": "2025-2026第一学期"
+   },
+   "url": "https://lms.szu.edu.cn:443/course/80101/index"
+  }
+ ],
+ "homework": {
+  "90101": [
+   {
+    "id": 1,
+    "title": "实验1：抓包分析 TCP 三次握手",
+    "type": "homework",
+    "published": true,
+    "deadline": "2026-10-12T15:59:00Z",
+    "end_time": "2026-10-12T15:59:00Z",
+    "start_time": null,
+    "submitted": true,
+    "score": "92",
+    "is_closed": true,
+    "can_make_up_homework": false,
+    "user_submit_count": 1,
+    "submit_by_group": false,
+    "data": {
+     "description": "",
+     "homework_type": "file_upload"
+    },
+    "uploads": [
+     {
+      "id": 1,
+      "name": "实验1指导书.pdf",
+      "key": "deadbeef",
+      "type": "document"
+     }
+    ]
+   },
+   {
+    "id": 2,
+    "title": "实验2：路由协议配置",
+    "type": "homework",
+    "published": true,
+    "deadline": "2026-11-02T15:59:00Z",
+    "end_time": "2026-11-02T15:59:00Z",
+    "start_time": null,
+    "submitted": true,
+    "score": null,
+    "is_closed": true,
+    "can_make_up_homework": false,
+    "user_submit_count": 1,
+    "submit_by_group": false,
+    "data": {
+     "description": "",
+     "homework_type": "file_upload"
+    },
+    "uploads": []
+   },
+   {
+    "id": 3,
+    "title": "实验3：Socket 编程",
+    "type": "homework",
+    "published": true,
+    "deadline": "2026-11-20T15:59:00Z",
+    "end_time": "2026-11-20T15:59:00Z",
+    "start_time": null,
+    "submitted": false,
+    "score": null,
+    "is_closed": false,
+    "can_make_up_homework": false,
+    "user_submit_count": 0,
+    "submit_by_group": false,
+    "data": {
+     "description": "<div>提交 <b>源码压缩包</b> 和实验报告（PDF）。</div>",
+     "homework_type": "file_upload"
+    },
+    "uploads": [
+     {
+      "id": 1,
+      "name": "实验3指导书.pdf",
+      "key": "deadbeef",
+      "type": "document"
+     }
+    ]
+   }
+  ],
+  "90102": [
+   {
+    "id": 11,
+    "title": "作业1：线性回归",
+    "type": "homework",
+    "published": true,
+    "deadline": "2026-10-20T15:59:00Z",
+    "end_time": "2026-10-20T15:59:00Z",
+    "start_time": null,
+    "submitted": true,
+    "score": "88",
+    "is_closed": true,
+    "can_make_up_homework": false,
+    "user_submit_count": 1,
+    "submit_by_group": false,
+    "data": {
+     "description": "",
+     "homework_type": "file_upload"
+    },
+    "uploads": []
+   },
+   {
+    "id": 12,
+    "title": "作业2：决策树",
+    "type": "homework",
+    "published": true,
+    "deadline": "2026-11-10T15:59:00Z",
+    "end_time": "2026-11-10T15:59:00Z",
+    "start_time": null,
+    "submitted": false,
+    "score": null,
+    "is_closed": true,
+    "can_make_up_homework": true,
+    "user_submit_count": 0,
+    "submit_by_group": false,
+    "data": {
+     "description": "",
+     "homework_type": "file_upload"
+    },
+    "uploads": []
+   },
+   {
+    "id": 13,
+    "title": "课程项目开题报告",
+    "type": "homework",
+    "published": true,
+    "deadline": "2026-11-25T15:59:00Z",
+    "end_time": "2026-11-25T15:59:00Z",
+    "start_time": null,
+    "submitted": false,
+    "score": null,
+    "is_closed": false,
+    "can_make_up_homework": false,
+    "user_submit_count": 0,
+    "submit_by_group": false,
+    "data": {
+     "description": "",
+     "homework_type": "file_upload"
+    },
+    "uploads": []
+   }
+  ],
+  "90103": [
+   {
+    "id": 21,
+    "title": "实验3",
+    "type": "homework",
+    "published": true,
+    "deadline": "2026-11-23T15:59:00Z",
+    "end_time": "2026-11-23T15:59:00Z",
+    "start_time": null,
+    "submitted": false,
+    "score": null,
+    "is_closed": false,
+    "can_make_up_homework": false,
+    "user_submit_count": 0,
+    "submit_by_group": false,
+    "data": {
+     "description": "",
+     "homework_type": "file_upload"
+    },
+    "uploads": []
+   }
+  ],
+  "80101": [
+   {
+    "id": 31,
+    "title": "作业1",
+    "type": "homework",
+    "published": true,
+    "deadline": "2025-10-26T15:59:00Z",
+    "end_time": "2025-10-26T15:59:00Z",
+    "start_time": null,
+    "submitted": true,
+    "score": "91",
+    "is_closed": true,
+    "can_make_up_homework": false,
+    "user_submit_count": 1,
+    "submit_by_group": false,
+    "data": {
+     "description": "",
+     "homework_type": "file_upload"
+    },
+    "uploads": [
+     {
+      "id": 1,
+      "name": "作业1.pdf",
+      "key": "deadbeef",
+      "type": "document"
+     }
+    ]
+   },
+   {
+    "id": 32,
+    "title": "期末大作业",
+    "type": "homework",
+    "published": true,
+    "deadline": "2025-12-24T15:59:00Z",
+    "end_time": "2025-12-24T15:59:00Z",
+    "start_time": null,
+    "submitted": true,
+    "score": null,
+    "is_closed": true,
+    "can_make_up_homework": false,
+    "user_submit_count": 1,
+    "submit_by_group": false,
+    "data": {
+     "description": "<div>提交时前三页单面打印（评分表、论文首页、手签学术诚信承诺书）。</div>",
+     "homework_type": "file_upload"
+    },
+    "uploads": []
+   }
+  ]
+ }
+}

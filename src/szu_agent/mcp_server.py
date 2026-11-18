@@ -119,7 +119,7 @@ def _slim_lecture(item: dict[str, Any]) -> dict[str, Any]:
 class RoutedCampus:
     """多人模式下的 svc：每次调用时按“这次替谁执行”取那个人的学校客户端（CampusPool）。
 
-    工具代码里全部是 svc.xxx(...) 形式的方法调用，所以用代理就能让 39 个工具一行不改。
+    工具代码里全部是 svc.xxx(...) 形式的方法调用，所以用代理就能让所有工具一行不改。
     认不出是谁时（多人模式下请求没带用户身份）返回 LOGIN_REQUIRED——宁可失败，
     也绝不退回到“本机账号”，否则会拿服务器上别人的登录凭证去查。"""
 
@@ -809,6 +809,41 @@ def create_server(campus: Any = None) -> FastMCP:
                 # 省 token：去掉空字段和“正常考试”（只有补考、重修之类才值得说）
                 group["courses"] = [{k: v for k, v in c.items() if v is not None and not (k == "examType" and v == "正常考试")}
                                     for c in group["courses"]]
+        return res
+
+    @mcp.tool(annotations=READ_ONLY)
+    async def lms_homework(
+        course: Annotated[str | None, Field(description="课程名的一部分，如“计算机网络”；不填 = 这学期所有课")] = None,
+        term: Annotated[str | None, Field(
+            description="学期，如“2025-2026-1”或“2025-2026第一学期”；不填 = 当前学期（填了 course 时在全部学期里找）")] = None,
+        pending_only: Annotated[bool, Field(description="true = 只要还没交的作业（问“有什么作业没交 / 快到期”时用）")] = False,
+    ) -> dict[str, Any]:
+        """查畅课（lms.szu.edu.cn，学校的课程平台）上的作业：交没交、老师给的分数、截止时间（北京时间）、作业要求。
+        用于“我还有什么作业没交”“这周有哪些 ddl”“计算机网络实验 2 多少分”“作业出分了吗”。
+        pending 是所有待交 / 可补交的作业，按截止时间排好，hoursLeft 是剩余小时数；status：已交 / 待交 / 未开始 / 可补交 / 已截止未交。
+        score 为 null 就是还没评分，不要猜分数。这是平时作业的分数，课程总评 / 期末成绩不在畅课里。
+        role=teaching 的课是用户当老师或助教的课，不算他的作业。"""
+        res = await call(svc.lms_homework(course, term, pending_only))
+        if res["ok"]:
+            for g in res["data"]["courses"]:
+                g["homework"] = [{k: v for k, v in h.items() if v not in (None, [], False) and k not in ("id", "submitCount")}
+                                 for h in g.get("homework", [])]
+                if not g["homework"]:
+                    g.pop("homework")
+            res["data"]["pending"] = [{k: v for k, v in p.items() if v is not None} for p in res["data"]["pending"]]
+        return res
+
+    @mcp.tool(annotations=READ_ONLY)
+    async def lms_courses(
+        term: Annotated[str | None, Field(
+            description="学期，如“2025-2026-1”或“2025-2026第一学期”；“all” = 全部学期；不填 = 当前学期")] = None,
+    ) -> dict[str, Any]:
+        """列出畅课（学校的课程平台）上的课程：课程名、授课老师、学期。用于“我畅课上有哪些课”。
+        查作业和作业分数直接用 lms_homework，不用先调这个。role=teaching 是用户当老师或助教的课。"""
+        res = await call(svc.lms_courses(term))
+        if res["ok"]:
+            res["data"]["courses"] = [{k: v for k, v in c.items() if v not in (None, [], "student") and k not in ("id", "termKey")}
+                                      for c in res["data"]["courses"]]
         return res
 
     @mcp.tool(annotations=READ_ONLY)

@@ -391,6 +391,22 @@ class RealCampus:
         return {"term": picked[1], "items": items, "unscheduled": unscheduled,
                 "availableTerms": [n for _, n in terms], "url": GS_COURSE_PAGE}
 
+    # ------------------------------------------------------------ 畅课（lms.szu.edu.cn，2026-11-18 抓包；见 campus/lms.py）
+
+    async def lms_courses(self, term: str | None = None) -> dict[str, Any]:
+        from . import lms
+        from .booth import beijing_now
+
+        return await lms.courses_report(lambda: lms.fetch_courses(self.http), term, beijing_now().date())
+
+    async def lms_homework(self, course: str | None = None, term: str | None = None,
+                           pending_only: bool = False) -> dict[str, Any]:
+        from . import lms
+        from .booth import beijing_now
+
+        return await lms.homework_report(lambda: lms.fetch_courses(self.http), lambda cid: lms.fetch_homework(self.http, cid),
+                                         course=course, term=term, pending_only=pending_only, now=beijing_now())
+
     # ------------------------------------------------------------ 研究生成绩（2026-11-17 抓包 + 真实账号自检）
 
     async def grades(self, term: str | None = None) -> dict[str, Any]:
