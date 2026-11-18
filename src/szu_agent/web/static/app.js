@@ -88,15 +88,18 @@ function el(tag, cls, html) {
   if (html != null) e.innerHTML = html;
   return e;
 }
-function nearBottom() { return window.innerHeight + window.scrollY >= document.body.scrollHeight - 160; }
-function scrollDown(force) { if (force || nearBottom()) window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }); }
+// 触屏设备上滚动发生在 main 里（文档本身不滚，见 style.css），电脑上是整页滚动
+const touch = matchMedia("(hover: none) and (pointer: coarse)").matches;
+const scroller = touch ? document.querySelector("main") : document.scrollingElement;
+function nearBottom() { return scroller.clientHeight + scroller.scrollTop >= scroller.scrollHeight - 160; }
+function scrollDown(force) { if (force || nearBottom()) scroller.scrollTo({ top: scroller.scrollHeight, behavior: "smooth" }); }
 // 打开对话 / 切回聊天：直接停在最新消息处。平滑滚动在卡片还在渲染（高度变化）时会停在半路，
 // 所以立即跳到底，下一帧和卡片异步内容加载后再补一次（用户这期间自己滚动了就不再动）
 function jumpToBottom() {
-  const go = () => { window.scrollTo({ top: document.body.scrollHeight, behavior: "instant" }); return window.scrollY; };
+  const go = () => { scroller.scrollTo({ top: scroller.scrollHeight, behavior: "instant" }); return scroller.scrollTop; };
   let y = go();
   requestAnimationFrame(() => { y = go(); });
-  setTimeout(() => { if (Math.abs(window.scrollY - y) < 4) go(); }, 450);
+  setTimeout(() => { if (Math.abs(scroller.scrollTop - y) < 4) go(); }, 450);
 }
 
 function showChatStarted(when) {
@@ -779,7 +782,7 @@ async function ask(text) {
   input.value = ""; autosize();
   addUser(text); scrollDown(true);
   await runTurn("/api/chat", { thread_id: threadId, message: text });
-  input.focus();
+  if (!touch) input.focus();  // 手机上自动聚焦会把收起的键盘又弹出来，挡住刚回复的内容
 }
 
 // ---------------- 恢复历史 ----------------
@@ -1213,6 +1216,12 @@ function renderAccount() {
 }
 
 // ---------------- 输入 ----------------
+// 兜底：键盘收起后，iOS 偶尔把文档留在偏移位置。文档本来就不该滚动，归零即可（聊天内容在 main 里滚，不受影响）
+function settleViewport() { if (document.activeElement !== input && (window.scrollY || window.visualViewport?.offsetTop)) window.scrollTo(0, 0); }
+if (touch) {  // 电脑上是整页滚动，不能归零
+  input.addEventListener("blur", () => setTimeout(settleViewport, 300));
+  window.visualViewport?.addEventListener("resize", () => setTimeout(settleViewport, 100));
+}
 function autosize() { input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight, 160) + "px"; }
 function updateSend() { send.disabled = busy || !input.value.trim() || !!quota?.exhausted; }
 

@@ -231,7 +231,15 @@ button { cursor: pointer; }
 @media (max-width: 1180px) { .side { display: none; } }
 
 /* ---------------- 中间对话列 ---------------- */
+/* 手机上文档本身不滚动，只有 main 在里面滚：iOS Safari 弹出键盘时会把整页往上推，收起后可视区域有时停在偏移处，
+   fixed 的顶栏、输入框整体错位（顶栏跑到状态栏后面）。文档没有可滚的高度，就没有地方“停歪”。
+   只在触屏设备上这样做；电脑上保持整页滚动（滚轮在页面任何位置都能滚，左侧面板也不会被 main 盖住）。 */
 main { padding: 96px 16px 140px; }
+@media (hover: none) and (pointer: coarse) {
+  html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+  main { position: fixed; inset: 0; overflow-y: auto; overscroll-behavior: contain; }
+  .side { z-index: 1; }  /* 横屏平板会显示左侧面板，别被 main 盖住 */
+}
 .column { max-width: var(--col); margin: 0 auto; }
 
 .empty { text-align: center; padding-top: 14vh; }
