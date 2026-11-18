@@ -128,3 +128,24 @@ def test_quota_off_by_default_in_single_user(home, monkeypatch):
     monkeypatch.delenv("SZU_AGENT_DAILY_QUOTA_CNY", raising=False)
     with TestClient(create_app(mock=True, llm=ScriptedChatModel(script=[]), profile=ProfileStore(home / "p.json"))) as client:
         assert client.get("/api/quota").json() == {"enabled": False}
+
+
+def test_qwen_pricing_is_tiered_with_cache_discount_and_no_peak():
+    from szu_agent.agent.pricing import peak_applies
+    peak = datetime(2026, 11, 16, 10, 0, tzinfo=CST)  # 周一高峰：千问没有高峰价
+    # qwen3.7-flash ≤32K 档：输入 0.2、命中 0.04（20%）、输出 0.8
+    assert abs(cost_cny("qwen3.7-flash", cache_hit=10_000, cache_miss=10_000, output=1_000, at=peak)
+               - (10_000 * 0.04 + 10_000 * 0.2 + 1_000 * 0.8) / 1e6) < 1e-12
+    # 单次输入超过 32K 进下一档（0.6 / 2.4）
+    assert abs(cost_cny("qwen3.7-flash", cache_hit=0, cache_miss=40_000, output=0, at=peak) - 40_000 * 0.6 / 1e6) < 1e-12
+    assert not peak_applies("qwen3.7-flash", peak) and peak_applies("deepseek-flash", peak)
+    assert abs(cost_cny("qwen3.7-flash-2026-07-15", cache_hit=0, cache_miss=1_000, output=0, at=peak) - 1_000 * 0.2 / 1e6) < 1e-12  # 快照名同价
+
+
+def test_make_llm_passes_enable_thinking_only_when_configured(monkeypatch):
+    from szu_agent.agent.runtime import make_llm
+    monkeypatch.setenv("LLM_API_KEY", "sk-test")
+    monkeypatch.delenv("LLM_ENABLE_THINKING", raising=False)
+    assert not make_llm().extra_body  # DeepSeek 官方接口不认这个参数：不设就不传
+    monkeypatch.setenv("LLM_ENABLE_THINKING", "0")
+    assert make_llm().extra_body == {"enable_thinking": False}

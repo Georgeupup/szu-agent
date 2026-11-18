@@ -22,7 +22,7 @@ from typing import Any
 from langchain_core.messages import AIMessage
 
 from ..campus.session import agent_home
-from .pricing import CST, cost_cny, is_peak
+from .pricing import CST, cost_cny, peak_applies
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS llm_calls (
@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS llm_calls (
     output_tokens INTEGER,
     reasoning_tokens INTEGER,
     latency_ms INTEGER,
-    peak INTEGER NOT NULL DEFAULT 0,  -- 是否高峰时段（价格 ×2）
+    peak INTEGER NOT NULL DEFAULT 0,  -- 是否按高峰价算（DeepSeek 工作日高峰 ×2）
     cost_cny REAL                     -- 写入时按当时价格算好；不认识的模型为 NULL
 );
 CREATE INDEX IF NOT EXISTS llm_calls_ts ON llm_calls (ts);
@@ -109,7 +109,7 @@ class UsageStore:
                 " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (at.astimezone(timezone.utc).isoformat(timespec="seconds"), user_id, thread_id, purpose, model,
                  *((u["input"], u["hit"], u["miss"], u["output"], u["reasoning"]) if u else (None,) * 5),
-                 latency_ms, int(is_peak(at)), cost))
+                 latency_ms, int(peak_applies(model, at)), cost))
 
     def spent_today(self, user_id: str, *, now: datetime | None = None) -> float:
         """这个用户北京时间今天已经花了多少元（回答 + 压缩历史都算）。没配价格的模型记为 0。"""

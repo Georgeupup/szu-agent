@@ -38,7 +38,7 @@
 
 ## 本地部署
 
-环境要求：Python 3.12+、[uv](https://docs.astral.sh/uv/)、任一兼容 OpenAI 接口且支持函数调用的大模型（默认 DeepSeek）。
+环境要求：Python 3.12+、[uv](https://docs.astral.sh/uv/)、任一兼容 OpenAI 接口且支持函数调用的大模型（默认阿里云百炼 qwen3.7-flash，也可用 DeepSeek）。
 
 ```bash
 uv sync

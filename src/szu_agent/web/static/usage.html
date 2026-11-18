@@ -146,7 +146,7 @@ async function load(days) {
     : `<tr><td class="empty">暂无</td></tr>`;
 
   const p = r.pricing;
-  $("note").innerHTML = `模型 ${esc(p.model)}。${esc(p.note)} 价格来源：<a href="${esc(p.source)}" target="_blank" rel="noopener">DeepSeek 官方价格页</a>（${esc(p.verifiedAt)} 核对）。`
+  $("note").innerHTML = `模型 ${esc(p.model)}。${esc(p.note)} 价格来源：<a href="${esc(p.source)}" target="_blank" rel="noopener">${esc(p.sourceName || "官方价格页")}</a>（${esc(p.verifiedAt)} 核对）。`
     + (t.no_usage ? ` 有 ${t.no_usage} 次调用接口没返回用量，未计入。` : "");
 }
 
