@@ -132,6 +132,11 @@ body {
   min-height: 100dvh;
 }
 button, textarea { font: inherit; color: inherit; }
+/* iOS Safari 聚焦字号 <16px 的输入框会自动放大页面，输完也不缩回。手机上输入框一律 16px；
+   不用 viewport 的 maximum-scale=1：那样会连双指缩放一起禁掉（Android 上），不利于看小字 */
+@media (hover: none) and (pointer: coarse) {
+  textarea, input, select { font-size: 16px; }
+}
 button { cursor: pointer; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 [hidden] { display: none !important; }
